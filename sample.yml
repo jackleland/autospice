@@ -1,0 +1,15 @@
+[scheduler]
+  name:       Simulation
+  machine:    marconi
+  user:       tnichola
+  walltime:   8:00:00
+  queue:      skl_fua_prod
+  account:    FUSIO_ru3CCFE
+  n_cpus:     48
+
+[code]
+  input:      ./BOUT.inp
+  output:     ./out/
+  executable: ./folder/storm.exe
+  restart:    False
+  append:     False
