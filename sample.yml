@@ -1,15 +1,23 @@
 [scheduler]
-  name:       Simulation
+  job_name:   masalatest
   machine:    marconi
-  user:       tnichola
-  walltime:   8:00:00
+  user:       jleland0
+  email:      j.leland@liverpool.ac.uk
+  walltime:   48:00:00
   queue:      skl_fua_prod
-  account:    FUSIO_ru3CCFE
+  account:    FUA33_FMPSPICE
   n_cpus:     48
+  memory:     512
 
 [code]
-  input:      ./BOUT.inp
-  output:     ./out/
-  executable: ./folder/storm.exe
-  restart:    False
-  append:     False
+  bin:            ~/Spice/spice2/bin
+  input:          ./inputs/test/test_probe.inp
+  output:         ./data/test/masalatest/
+  executable:     spice-2.11-release.bin
+  code_name:      spice
+
+[spice]
+  spice_version:  2
+  verbose:        True
+  soft_restart:   False
+  full_restart:   False
