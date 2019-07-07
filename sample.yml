@@ -10,8 +10,8 @@
   memory:     512
 
 [code]
-  bin:            ~/Spice/spice2/bin
-  input:          ./inputs/test/test_probe.inp
+  bin:            /home/jleland/Spice/spice2/bin
+  input:          ./inputs/dsfprobes/dsfprobe_S.inp
   output:         ./data/test/masalatest/
   executable:     spice-2.11-release.bin
   code_name:      spice
