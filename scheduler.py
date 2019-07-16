@@ -23,7 +23,7 @@ class Scheduler(ABC):
     - 'walltime'                        - Yes
     - 'out_log'                         - Yes
     - 'err_log'                         - Yes
-    - 'queue_name'                      - No
+    - 'queue'                           - No
     - 'memory'                          - No
     - 'account'                         - No
     - 'email'                           - No
@@ -50,7 +50,7 @@ class Scheduler(ABC):
         'err_log'
     }
     OPTIONAL_PARAMS = {
-        'queue_name',
+        'queue',
         'account',
         'memory',
         'email',
@@ -102,7 +102,7 @@ class Scheduler(ABC):
         - 'err_log'
 
         optional:
-        - 'queue_name'
+        - 'queue'
         - 'memory'
         - 'account'
         - 'email'
@@ -119,13 +119,14 @@ class Scheduler(ABC):
         if not isinstance(submission_params, dict):
             raise TypeError('submission_params must be a dictionary')
         if not self.REQUIRED_PARAMS.issubset(submission_params.keys()):
-            raise ValueError('submission_params must contain all of the required '
-                             f'parameters {self.REQUIRED_PARAMS}')
+            raise ValueError(f'submission_params must contain all of the required parameters {self.REQUIRED_PARAMS}. \n'
+                             f'{self.REQUIRED_PARAMS - submission_params.keys()} was/were missing from submission '
+                             f'params.')
         if not set(submission_params.keys()
                    - self.REQUIRED_PARAMS).issubset(self.OPTIONAL_PARAMS):
-            raise ValueError(f'The only allowed optional parameters are '
-                             f'{self.OPTIONAL_PARAMS}. You have input additional'
-                             f'parameters {submission_params.keys() - self.REQUIRED_PARAMS - self.OPTIONAL_PARAMS}')
+            raise ValueError(f'The only allowed optional parameters are {self.OPTIONAL_PARAMS}. You have input '
+                             f'additional parameters \n'
+                             f'{submission_params.keys() - self.REQUIRED_PARAMS - self.OPTIONAL_PARAMS}')
 
         # Construct list of parameter-value mappings joined by new-line symbols
         param_value_list = [self.shebang]
@@ -151,7 +152,7 @@ class Slurm(Scheduler):
             'walltime': '#SBATCH -t {}',
             'out_log': '#SBATCH -o {}',
             'err_log': '#SBATCH -e {}',
-            'queue_name': '#SBATCH -p {}',
+            'queue': '#SBATCH -p {}',
             'account': '#SBATCH -A {}',
             'memory': '#SBATCH --mem={}gb',
             'email': '#SBATCH --mail-user={}',
@@ -162,49 +163,60 @@ class Slurm(Scheduler):
 
 class PBS(Scheduler):
     """
-    Implementation of Scheduler for the LoadLeveller queue submission system.
+    Implementation of Scheduler for the PBS queue submission system.
     """
-    REQUIRED_PARAMS = {
-        'job_name',
-        'nodes',
-        'cpus_per_node',
-        'walltime',
-        'out_log',
-        'err_log',
-        'initial_dir'
-    }
     OPTIONAL_PARAMS = {
-        'queue_name',
+        'queue',
         'email',
         'email_events',
-        'memory'
+        'memory',
+        'initial_dir'
     }
 
     def __init__(self):
         parameter_mappings = {
-            'job_name': '# @ job_name = {}',
-            'nodes': '# @ nodes = {}',
-            'cpus_per_node': '# @ cpus_per_node = {}',
-            'walltime': '# @ walltime = {}',
-            'out_log': '# @ output = {}',
-            'err_log': '# @ error = {}',
-            'initial_dir': '# @ initialdir = {}',
-            'queue_name': '# @ queue = {}',
-            'memory': '# @ requirements = (Memory >= {}gb)',
-            'email': '# @ notify_user = {}',
-            'email_events': '# @ notification = {}'
+            'job_name':         '#PBS -N {}',
+            'nodes':            '#PBS -l nodes={}',
+            'cpus_per_node':    '#PBS -l ppn={}',
+            'walltime':         '#PBS -l walltime={}',
+            'out_log':          '#PBS -o {}',
+            'err_log':          '#PBS -e {}',
+            'initial_dir':      '#PBS -d {}',
+            'queue':            '#PBS -q {}',
+            'memory':           '#PBS -l pmem={}gb',
+            'email':            '#PBS -M {}',
+            'email_events':     '#PBS -m {}'
         }
         super().__init__('PBS', parameter_mappings, script_ext='.pbs', script_lang='bash')
 
 
-class Loadleveller(PBS):
+class Loadleveller(Scheduler):
     """
     Implementation of Scheduler for the LoadLeveller queue submission system.
     """
+    OPTIONAL_PARAMS = {
+        'queue',
+        'email',
+        'email_events',
+        'memory',
+        'initial_dir'
+    }
 
     def __init__(self):
-        super().__init__()
-        self.name = 'Loadleveller'
+        parameter_mappings = {
+            'job_name':         '# @ job_name = {}',
+            'nodes':            '# @ nodes = {}',
+            'cpus_per_node':    '# @ cpus_per_node = {}',
+            'walltime':         '# @ walltime = {}',
+            'out_log':          '# @ output = {}',
+            'err_log':          '# @ error = {}',
+            'initial_dir':      '# @ initialdir = {}',
+            'queue':            '# @ queue = {}',
+            'memory':           '# @ requirements = (Memory >= {}gb)',
+            'email':            '# @ notify_user = {}',
+            'email_events':     '# @ notification = {}'
+        }
+        super().__init__('Loadleveller', parameter_mappings, script_ext='.pbs', script_lang='bash')
 
     def get_submission_script_header(self, submission_params, executable=None, arguments=None):
         script_header = super().get_submission_script_header(submission_params)

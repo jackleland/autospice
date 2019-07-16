@@ -11,7 +11,7 @@
 
 [code]
   bin:            /home/jleland/Spice/spice2/bin
-  input:          ./inputs/dsfprobes/dsfprobe_S.inp
+  input:          ./inputs/test/autospice_test.inp
   output:         ./data/test/masalatest/
   executable:     spice-2.11-release.bin
   code_name:      spice

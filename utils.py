@@ -1,7 +1,6 @@
 from pathlib import Path
 
 
-
 def find_next_available_filename(filename):
     filename_ext = filename.suffix
     return find_next_available_dir(filename).with_suffix(filename_ext)
@@ -29,3 +28,5 @@ def find_next_available_dir(directory):
 #
 #     # TODO: Check if the executable has been compiled since the last commit
 #     # TODO: Other repos e.g. mercurial etc.?
+def full(path):
+    return str(path.resolve())

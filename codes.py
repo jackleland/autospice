@@ -1,12 +1,17 @@
 import abc
+import os
+import shutil
 from pathlib import Path
 import pprint as pp
 from collections import OrderedDict
+from flopter.spice.inputparser import InputParser
+from utils import find_next_available_dir
 
 
 class SimulationCode(abc.ABC):
     """
-    Abstract base class for storing code specific options and any necessary verification methods
+    Abstract base class for storing code specific options and any necessary
+    verification methods
     """
     SUBCLASS_COUNT = 0
 
@@ -74,6 +79,10 @@ class SimulationCode(abc.ABC):
     def is_code_output_dir(directory):
         pass
 
+    @abc.abstractmethod
+    def directory_io(self, output_dir, config_opts, dryrun_fl):
+        pass
+
     @classmethod
     def increment_counter(cls):
         cls.SUBCLASS_COUNT += 1
@@ -83,6 +92,7 @@ class Spice(SimulationCode):
     """
     Implementation of Code class for Spice (2 & 3) with specific methods for processing config file options and
     verifying Spice input files.
+
     """
     RESTART_MODE_FORMATS = {
         'bool': (False, True, True),
@@ -144,24 +154,24 @@ class Spice(SimulationCode):
                                    multi_submission=False, safe_job_time_fl=True):
         executable_dir = executable.parent
         precall_str = (
-            'echo "Date is: $(env TZ=GB date)"\n'
+            '\necho "Date is: $(env TZ=GB date)"\n'
             'echo "MPI version is: "\n'
             'echo ""\n'
             'mpirun --version\n'
             'echo ""\n'
             f'echo "Changing directory to {executable_dir}"\n'
-            f'cd {executable_dir}\n'
+            f'cd {executable_dir}\n\n'
 
             'if [ $(ulimit -s) != "unlimited" ]; then\n'
             '\techo "ulimit is:"\n'
-            '\tulimit -s\n'
+            '\tulimit -s\n\n'
 
             '\techo ""\n'
             '\tulimit -s unlimited\n'
             '\techo "new ulimit is:"\n'
             '\tulimit -s\n'
             '\techo ""\n'
-            'fi\n'
+            'fi\n\n'
         )
 
         job_name = output_dir.name
@@ -171,13 +181,16 @@ class Spice(SimulationCode):
         config_file_args = self.get_command_line_args(config_opts)
         if multi_submission and not Spice.is_restart(config_opts):
             config_file_args.append('-c')
+
         if machine.max_job_time is not None and safe_job_time_fl:
             config_file_args.append(f'-l {machine.get_safe_job_time()}')
-        mpirun_command = ' '.join(['mpirun', '-np', cpus_tot, executable,
+
+        mpirun_command = ' '.join(['mpirun', '-np', str(cpus_tot), str(executable),
                                    *config_file_args,
-                                   '-o', o_file,
-                                   '-i', input_file,
-                                   '-t', t_file])
+                                   '-o', str(o_file),
+                                   '-i', str(input_file),
+                                   '-t', str(t_file)
+                                   ])
         call_str = (
             'echo ""\n'
             f'echo "executing: {mpirun_command}"\n'
@@ -211,8 +224,34 @@ class Spice(SimulationCode):
         pass
 
     def is_parameter_scan(self, input_file):
-        # TODO: Implement this!
-        return False
+        input_parser = InputParser(input_filename=input_file, read_comments_fl=False)
+        scan_params = input_parser.get_scanning_params()
+        if len(scan_params) > 1:
+            raise ValueError('Attempting multi-dimensional parameter scan, not currently supported')
+        return len(scan_params) == 1
+
+    def get_scanning_parameters(self, input_file):
+        """
+        Method for returning information about the parameters specified to be
+        scanned. Returns a list of dictionaries with four entries for each
+        scanning parameter, of the form:
+        {
+            'section':      [string] name of section where parameter is
+            'parameter':    [string] name of parameter being scanned
+            'values':       [list] parameter values to be scanned
+            'length':       [int] length of the parameter scan, i.e. how many
+                            values in the list of parameters
+        }
+
+        :return:    list of dicts containing the above data for each parameter
+
+        """
+        input_parser = InputParser(input_filename=input_file)
+        scan_params = input_parser.get_scanning_params()
+        # TODO: (2019-07-15) Implement multi-dimensional scans
+        if len(scan_params) > 1:
+            raise ValueError('Attempting multi-dimensional parameter scan, not currently supported')
+        return scan_params, input_parser
 
     @staticmethod
     def is_code_output_dir(directory):
@@ -225,3 +264,36 @@ class Spice(SimulationCode):
                    and len(list(directory.glob('t-*.mat'))) > 1
         else:
             return False
+
+    def directory_io(self, output_dir, config_opts, dryrun_fl):
+        # Directory I/O for regular and restart runs. If regular 'spice' io, create directory; if restart, backup
+        # directory before starting run.
+        restart_fl = self.is_restart(config_opts)
+        if not restart_fl:
+            # If not restarting then check if the output folder exists already.
+            if output_dir.exists() and output_dir.is_dir():
+                print(f"WARNING: {output_dir} already exists, searching for next available similar directory \n")
+                output_dir = find_next_available_dir(output_dir)
+
+            # Create output directory
+            print(f"Using directory {output_dir} \n")
+            if not dryrun_fl:
+                os.mkdir(output_dir)
+
+        elif output_dir.exists() and self.is_code_output_dir(output_dir):
+            # If restarting make a backup of the existing directory and run from there
+            restart_dir = find_next_available_dir(Path(f"{output_dir}_restart"))
+            print(f"Restarting {self.name} run in directory {restart_dir}, leave a backup of start files in "
+                  f"{output_dir} \n")
+
+            if not dryrun_fl:
+                shutil.copy(output_dir, restart_dir)
+            output_dir = restart_dir
+
+        elif output_dir.exists() and not output_dir.is_dir():
+            raise ValueError(f'Desired directory ({output_dir}) is not a {self.name} directory and therefore not '
+                             f'restartable.\n')
+        else:
+            raise FileNotFoundError(f'No directory found to restart at {output_dir} \n')
+
+        return output_dir

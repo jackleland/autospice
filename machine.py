@@ -85,23 +85,21 @@ class Machine(object):
         cpus_per_node = cpus // nodes
         cpus_per_node_remainder = cpus % nodes
         if cpus_per_node_remainder != 0:
-            raise ValueError('Number of processors chosen does not divide equally '
-                             f'between the nodes on {self.name}. There must be an'
-                             f'equal number of processors used on each node.')
+            raise ValueError(f'Number of processors chosen does not divide equally between the nodes on {self.name}. \n'
+                             'There must be an equal number of processors used on each node. \n')
         if cpus_per_node != self.max_cpus_per_node:
-            warn("Inefficient number of processors chosen - you won't be fully "
-                 "utilising every node. Your account will also be charged for all "
-                 "nodes occupied!")
+            print("WARNING: Inefficient number of processors chosen - you won't be fully utilising every node. Your \n"
+                  "account will still be charged for all nodes occupied \n")
 
         if nodes > self.max_nodes:
-            raise ValueError(f'Number of processors requested would require more nodes ({nodes}) than the maximum '
-                             f'available on this machine ({self.max_nodes})')
+            raise ValueError(f'Number of processors requested would require more nodes ({nodes}) than the maximum \n'
+                             f'available on this machine ({self.max_nodes})\n')
         elif nodes == self.max_nodes:
-            warn('Using maximum acceptable number of nodes on this machine. '
-                 'If you have any currently running jobs this job will not '
-                 'be run until they have finished.')
+            print('WARNING: Using maximum acceptable number of nodes on this machine. If you have any currently \n'
+                  'running jobs this job will not be run until they have finished. \n')
         return nodes, cpus_per_node
 
 
 marconi_skl = Machine('Marconi', 48, 182, 64, 24, "slurm")
-cumulus = Machine('Cumulus', 32, 512, 16, None, "slurm")
+marconi_skl_fuaspecial = Machine('Marconi', 48, 182, 64, 180, "slurm")
+cumulus = Machine('Cumulus', 32, 512, 16, None, "pbs")
