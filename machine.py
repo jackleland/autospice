@@ -35,8 +35,7 @@ class Machine(object):
                 warn('Cannot get safe job time as max job time is poorly defined.')
                 return 0
         else:
-            warn('Cannot get safe job time as max job time is not defined.')
-            return None
+            raise ValueError('Cannot get safe job time as max job time is not defined.')
 
     def get_n_jobs(self, requested_walltime, safe_job_time_fl=False):
         """
@@ -100,6 +99,6 @@ class Machine(object):
         return nodes, cpus_per_node
 
 
-marconi_skl = Machine('Marconi', 48, 182, 64, 24, "slurm")
-marconi_skl_fuaspecial = Machine('Marconi', 48, 182, 64, 180, "slurm")
+marconi_skl = Machine('Marconi', 48, 177, 64, 24, "slurm")
+marconi_skl_fuaspecial = Machine('Marconi', 48, 177, 64, 180, "slurm")
 cumulus = Machine('Cumulus', 32, 512, 16, None, "pbs")
