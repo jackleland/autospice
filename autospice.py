@@ -71,7 +71,9 @@ def submit_job(config_file, dryrun_fl=False):
     """
 
     # Read and parse the config file
-    config_file = Path.cwd() / Path(config_file)
+    # TODO: Getting the autospice dir should be more rigorous
+    autospice_dir = Path.cwd()
+    config_file = autospice_dir / Path(config_file)
     config = configparser.ConfigParser()
     config.read(config_file)
 
@@ -216,10 +218,12 @@ def submit_job(config_file, dryrun_fl=False):
 
                 # Log the submission to a google sheet using logger
                 # TODO: (2019-07-15) Expand to include n_jobs and param_scan_fl
-                logger = Logger()
+                # TODO: (2019-07-17) api_json_filename should be specified by a config file option, as should whether
+                #  the logger runs
+                logger = Logger(api_json_filename=str(autospice_dir / 'client_secret.json'))
                 logger.update_log({
                     'machine': machine_name,
-                    'job_number': job_num,
+                    'job_number': jobs[0],
                     'job_name': job_name,
                     'input_file': input_file,
                     'masala_config': config_file,
