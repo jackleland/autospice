@@ -62,8 +62,7 @@ class Logger(object):
         try:
             self.sheet = self.client.open(gsheet_name).sheet1
         except gspread.GSpreadException as e:
-            print("Unable to connect to google spreadsheet, logging not possible with "
-                  "current settings. "
+            print("Unable to connect to google spreadsheet, logging not possible with current settings. "
                   f"{e}")
             self.sheet = None
 
@@ -124,6 +123,7 @@ class Logger(object):
 
     # noinspection PyTypeHints
     def verify_log_data(self, log_data):
+        # TODO: Try and cast to the required type before failing the verification
         assert isinstance(log_data, dict)
         assert isinstance(self.log_format, dict)
 
