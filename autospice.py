@@ -204,7 +204,7 @@ def submit_job(config_file, dryrun_fl=False):
                                                   multi_submission=True)
 
                     for i in range(n_jobs - 1):
-                        out = subprocess.check_output(['sbatch', f'-d afterany:{job_num}', str(job_script)])
+                        out = subprocess.check_output(['sbatch', '-d', f'afterany:{job_num}', str(job_script)])
                         *rest, job_num = str(out, 'utf-8').split(' ')
                         job_num = job_num.strip()
                         print(f"\nSubmitted multisubmission {i}, job number {job_num}")

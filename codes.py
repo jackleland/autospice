@@ -190,7 +190,7 @@ class Spice(SimulationCode):
         if machine.max_job_time is not None and safe_job_time_fl:
             config_file_args.append(f'-l {machine.get_safe_job_time()}')
 
-        mpirun_command = ' '.join(['mpirun', '-np', str(cpus_tot), str(executable),
+        mpirun_command = ' '.join(['mpirun', '-np', str(cpus_tot), str(executable_dir / executable),
                                    *config_file_args,
                                    '-o', str(o_file),
                                    '-i', str(input_file),
