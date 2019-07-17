@@ -137,6 +137,7 @@ def submit_job(config_file, dryrun_fl=False):
     output_dir = sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl)
     if not dryrun_fl:
         shutil.copy(input_file, output_dir)
+        shutil.copy(config_file, output_dir)
 
     print_choices(scheduler_opts, code_opts, executable_dir / input_file, executable_dir / output_dir,
                   executable_dir / executable, cpus_tot, nodes)
@@ -178,6 +179,7 @@ def submit_job(config_file, dryrun_fl=False):
             call_params = {
                 'cpus_tot': cpus_tot,
                 'executable': executable,
+                'executable_dir': executable_dir,
                 'output_dir': output_dir,
                 'input_file': input_file,
                 'config_opts': code_specific_opts
@@ -200,7 +202,7 @@ def submit_job(config_file, dryrun_fl=False):
                     job_script = write_job_script(submission_params, machine, sim_code, call_params, label='_1',
                                                   multi_submission=True)
 
-                    for i in n_jobs - 1:
+                    for i in range(n_jobs - 1):
                         out = subprocess.check_output(['sbatch', f'-d afterany:{job_num}', str(job_script)])
                         *rest, job_num = str(out, 'utf-8').split(' ')
                         print(f"\nSubmitted multisubmission {i}, job number {job_num}")
@@ -285,6 +287,7 @@ def print_choices(scheduler_opts, code_opts, full_input, full_output, full_exe_p
 
 def write_job_script(submission_params, machine, code, call_params, multi_submission=False, label='', dryrun_fl=False):
     header = machine.scheduler.get_submission_script_header(submission_params)
+
     body = code.get_submission_script_body(machine, *call_params.values(), multi_submission=multi_submission)
 
     if not dryrun_fl:

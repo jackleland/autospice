@@ -62,8 +62,7 @@ class SimulationCode(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_submission_script_body(self, machine, n_cpus, executable, output_dir, input_file, config_opts,
-                                   multi_submission=False):
+    def get_submission_script_body(self, machine, call_params, multi_submission=False):
         pass
 
     @abc.abstractmethod
@@ -150,9 +149,15 @@ class Spice(SimulationCode):
         cl_args = [restart_arg, verbose_arg]
         return [arg for arg in cl_args if arg is not None]
 
-    def get_submission_script_body(self, machine, cpus_tot, executable, output_dir, input_file, config_opts,
-                                   multi_submission=False, safe_job_time_fl=True):
-        executable_dir = executable.parent
+    def get_submission_script_body(self, machine, call_params, multi_submission=False, safe_job_time_fl=True):
+        # TODO: This should be replaced with either kwargs or an object
+        cpus_tot = call_params['cpus_tot']
+        executable = call_params['executable']
+        executable_dir = call_params['executable_dir']
+        output_dir = call_params['output_dir']
+        input_file = call_params['input_file']
+        config_opts = call_params['config_opts']
+
         precall_str = (
             '\necho "Date is: $(env TZ=GB date)"\n'
             'echo "MPI version is: "\n'
