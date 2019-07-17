@@ -290,7 +290,7 @@ def print_choices(scheduler_opts, code_opts, full_input, full_output, full_exe_p
 def write_job_script(submission_params, machine, code, call_params, multi_submission=False, label='', dryrun_fl=False):
     header = machine.scheduler.get_submission_script_header(submission_params)
 
-    body = code.get_submission_script_body(machine, *call_params.values(), multi_submission=multi_submission)
+    body = code.get_submission_script_body(machine, call_params, multi_submission=multi_submission)
 
     if not dryrun_fl:
         job_script = Path(str(call_params['output_dir'] / f'melange{label}') + machine.scheduler.script_ext)
