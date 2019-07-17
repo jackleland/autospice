@@ -24,6 +24,7 @@ class Scheduler(ABC):
     - 'out_log'                         - Yes
     - 'err_log'                         - Yes
     - 'queue'                           - No
+    - 'qos'                             - No
     - 'memory'                          - No
     - 'account'                         - No
     - 'email'                           - No
@@ -51,6 +52,7 @@ class Scheduler(ABC):
     }
     OPTIONAL_PARAMS = {
         'queue',
+        'qos',
         'account',
         'memory',
         'email',
@@ -103,6 +105,7 @@ class Scheduler(ABC):
 
         optional:
         - 'queue'
+        - 'qos'
         - 'memory'
         - 'account'
         - 'email'
@@ -153,6 +156,7 @@ class Slurm(Scheduler):
             'out_log': '#SBATCH -o {}',
             'err_log': '#SBATCH -e {}',
             'queue': '#SBATCH -p {}',
+            'qos': '#SBATCH -qos={}',
             'account': '#SBATCH -A {}',
             'memory': '#SBATCH --mem={}gb',
             'email': '#SBATCH --mail-user={}',
