@@ -71,7 +71,7 @@ def submit_job(config_file, dryrun_fl=False):
     """
 
     # Read and parse the config file
-    config_file = Path(config_file)
+    config_file = Path.cwd() / Path(config_file)
     config = configparser.ConfigParser()
     config.read(config_file)
 
@@ -137,7 +137,7 @@ def submit_job(config_file, dryrun_fl=False):
     output_dir = sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl)
     if not dryrun_fl:
         shutil.copy(input_file, output_dir)
-        shutil.copy(config_file.resolve(), output_dir)
+        shutil.copy(config_file, output_dir)
 
     print_choices(scheduler_opts, code_opts, executable_dir / input_file, executable_dir / output_dir,
                   executable_dir / executable, cpus_tot, nodes)
