@@ -257,7 +257,7 @@ def process_scheduler_opts(machine, scheduler_opts):
     if n_jobs > 1:
         print(f"Walltime requested ({walltime}) exceeds the maximum available walltime for a single job on \n"
               f"{machine.name}. The job will be split into {n_jobs} to complete successfully.")
-        walltime = f"{machine.get_safe_job_time()}:00:00"
+        walltime = f"{machine.max_job_time}:00:00"
 
     return cpus_per_node, cpus_tot, email, job_name, memory_req, n_jobs, nodes, walltime
 
