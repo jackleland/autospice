@@ -250,7 +250,7 @@ class Spice(SimulationCode):
         scan_params = input_parser.get_scanning_params()
         # TODO: (2019-07-15) Implement multi-dimensional scans
         if len(scan_params) > 1:
-            raise ValueError('Attempting multi-dimensional parameter scan, not currently supported')
+            raise ValueError('Requested multi-dimensional parameter scan, not currently supported')
         return scan_params, input_parser
 
     @staticmethod
