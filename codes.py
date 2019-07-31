@@ -182,7 +182,7 @@ class Spice(SimulationCode):
             f'cat {output_dir / LOG_PREFIX}.out >> {output_dir / LOG_PREFIX}.ongoing.out\n'
             f'cat {output_dir / LOG_PREFIX}.err >> {output_dir / LOG_PREFIX}.ongoing.err\n\n'
 
-            f'BU_FOLDER="{output_dir}/backup_$(env TZ=GB date +" % Y % m % d- % H % M")"\n'
+            f'BU_FOLDER="{output_dir}/backup_$(env TZ=GB date +"%Y%m%d-%H%M")"\n'
             'echo "Making backup of simulation data into $BU_FOLDER"\n'
             'mkdir "$BU_FOLDER"\n'
             f'cp {output_dir}/* $BU_FOLDER\n\n'
