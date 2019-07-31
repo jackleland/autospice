@@ -159,7 +159,7 @@ def submit_job(config_file, dryrun_fl=False):
                 if not dryrun_fl:
                     os.mkdir(output_dir)
 
-                input_file = output_dir / f'{param_dir}_{input_file_base.name}'
+                input_file = output_dir / 'input.inp'
                 inp_parser[scan_param['section']][scan_param['parameter']] = param_value
                 if not dryrun_fl:
                     with open(input_file, 'w') as f:
