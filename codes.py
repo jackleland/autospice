@@ -1,5 +1,4 @@
 import abc
-import os
 import shutil
 from pathlib import Path
 import pprint as pp
@@ -293,7 +292,7 @@ class Spice(SimulationCode):
             # Create output directory
             print(f"Using directory {output_dir} \n")
             if not dryrun_fl:
-                os.mkdir(output_dir)
+                output_dir.mkdir(parents=True)
 
         elif output_dir.exists() and self.is_code_output_dir(output_dir):
             # If restarting make a backup of the existing directory and run from there
