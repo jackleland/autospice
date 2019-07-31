@@ -7,6 +7,8 @@ from collections import OrderedDict
 from flopter.spice.inputparser import InputParser
 from utils import find_next_available_dir
 
+LOG_PREFIX = 'log'
+
 
 class SimulationCode(abc.ABC):
     """
@@ -177,6 +179,14 @@ class Spice(SimulationCode):
             '\tulimit -s\n'
             '\techo ""\n'
             'fi\n\n'
+
+            f'cat {output_dir / LOG_PREFIX}.out >> {output_dir / LOG_PREFIX}.ongoing.out\n'
+            f'cat {output_dir / LOG_PREFIX}.err >> {output_dir / LOG_PREFIX}.ongoing.err\n\n'
+
+            f'BU_FOLDER="{output_dir}/backup_$(env TZ=GB date +" % Y % m % d- % H % M")"\n'
+            'echo "Making backup of simulation data into $BU_FOLDER"\n'
+            'mkdir "$BU_FOLDER"\n'
+            f'cp {output_dir}/* $BU_FOLDER\n\n'
         )
 
         job_name = output_dir.name
