@@ -81,14 +81,21 @@ class Machine(object):
     def calc_nodes(self, cpus):
         # Check if number of processors is sensible for this machine
         nodes = math.ceil(cpus / self.max_cpus_per_node)
+        cpus_per_node = self.check_nodes(cpus, nodes)
+        return nodes, cpus_per_node
+
+    def check_nodes(self, cpus, nodes):
         cpus_per_node = cpus // nodes
         cpus_per_node_remainder = cpus % nodes
-        if cpus_per_node_remainder != 0:
+        if cpus_per_node_remainder > 0:
             raise ValueError(f'Number of processors chosen does not divide equally between the nodes on {self.name}. \n'
                              'There must be an equal number of processors used on each node. \n')
-        if cpus_per_node != self.max_cpus_per_node:
+        if cpus_per_node > self.max_cpus_per_node:
+            raise ValueError(f'Number of processors requested does not fit onto {nodes} node(s) on {self.name}\n'
+                             f'You will need to increase the number of nodes requested. \n')
+        if cpus_per_node < self.max_cpus_per_node:
             print("WARNING: Inefficient number of processors chosen - you won't be fully utilising every node. Your \n"
-                  "account will still be charged for all nodes occupied \n")
+                  "account may still be charged for all nodes occupied \n")
 
         if nodes > self.max_nodes:
             raise ValueError(f'Number of processors requested would require more nodes ({nodes}) than the maximum \n'
@@ -96,7 +103,7 @@ class Machine(object):
         elif nodes == self.max_nodes:
             print('WARNING: Using maximum acceptable number of nodes on this machine. If you have any currently \n'
                   'running jobs this job will not be run until they have finished. \n')
-        return nodes, cpus_per_node
+        return cpus_per_node
 
 
 marconi_skl = Machine('Marconi', 48, 177, 64, 24, "slurm")

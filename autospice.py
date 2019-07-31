@@ -170,8 +170,8 @@ def submit_job(config_file, dryrun_fl=False):
                 'nodes': nodes,
                 'cpus_per_node': cpus_per_node,
                 'walltime': walltime,
-                'out_log': output_dir / 'log.out',
-                'err_log': output_dir / 'log.err',
+                'out_log': output_dir / f'{codes.LOG_PREFIX}.out',
+                'err_log': output_dir / f'{codes.LOG_PREFIX}.err',
                 'queue': scheduler_opts['queue'],
                 'memory': memory_req,
                 'account': scheduler_opts['account'],
@@ -243,12 +243,20 @@ def process_scheduler_opts(machine, scheduler_opts):
     print(f"Job completion and error notifications will be sent to {email} \n")
 
     # Check if number of processors is sensible for this machine
-    cpus_tot = scheduler_opts['n_cpus']
+    n_cpus = scheduler_opts['n_cpus']
     try:
-        cpus_tot = int(cpus_tot)
+        n_cpus = int(n_cpus)
     except:
         raise TypeError("Can't use a non-integer number of CPUs")
-    nodes, cpus_per_node = machine.calc_nodes(cpus_tot)
+
+    if 'nodes' not in scheduler_opts:
+        nodes, cpus_per_node = machine.calc_nodes(n_cpus)
+    else:
+        try:
+            nodes = int(scheduler_opts['nodes'])
+        except:
+            raise TypeError("Can't use a non-integer number of CPUs")
+        cpus_per_node = machine.check_nodes(n_cpus, nodes)
 
     memory_req = int(scheduler_opts['memory'])
     if memory_req > machine.memory_per_node * nodes:
@@ -267,7 +275,7 @@ def process_scheduler_opts(machine, scheduler_opts):
               f"{machine.name}. The job will be split into {n_jobs} to complete successfully.")
         walltime = f"{machine.max_job_time}:00:00"
 
-    return cpus_per_node, cpus_tot, email, job_name, memory_req, n_jobs, nodes, walltime
+    return cpus_per_node, n_cpus, email, job_name, memory_req, n_jobs, nodes, walltime
 
 
 def print_choices(scheduler_opts, code_opts, full_input, full_output, full_exe_path, cpus, nodes):

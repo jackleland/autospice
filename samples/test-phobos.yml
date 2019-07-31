@@ -6,7 +6,8 @@
   walltime:   48:00:00
   queue:      skl_fua_prod
   account:    FUA33_FMPSPICE
-  n_cpus:     48
+  n_cpus:     96
+  nodes:      3
   memory:     512
 
 [code]
