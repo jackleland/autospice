@@ -129,8 +129,9 @@ def submit_job(config_file, dryrun_fl=False):
     if param_scan_fl:
         scan_param, inp_parser = sim_code.get_scanning_parameters(input_file)
         scan_param = scan_param[0]
-        print(f"Submitting a parameter scan, scanning over \'{scan_param['parameter']}\' with the following values: \n"
-              f"{scan_param['values']} \n")
+        print(f"Submitting a parameter scan, scanning over \'{scan_param['parameter']}\' with the following values: \n")
+        for value in scan_param['values']:
+            print(f'\t{value}')
     else:
         scan_param = {'values': [None]}
         inp_parser = None
@@ -233,6 +234,8 @@ def submit_job(config_file, dryrun_fl=False):
                     'wtime_req': walltime,
                     'notes': ''
                 })
+    else:
+        shutil.rmtree(output_dir)
 
 
 def process_scheduler_opts(machine, scheduler_opts):
