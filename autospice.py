@@ -132,6 +132,7 @@ def submit_job(config_file, dryrun_fl=False):
         print(f"Submitting a parameter scan, scanning over \'{scan_param['parameter']}\' with the following values: \n")
         for value in scan_param['values']:
             print(f'\t{value}')
+        print('\n')
     else:
         scan_param = {'values': [None]}
         inp_parser = None
@@ -158,7 +159,7 @@ def submit_job(config_file, dryrun_fl=False):
                 param_dir = f"{scan_param['parameter']}_{param_value}"
                 output_dir = output_dir_base / param_dir
                 if not dryrun_fl:
-                    os.mkdir(output_dir)
+                    os.makedirs(output_dir, exist_ok=True)
 
                 input_file = output_dir / 'input.inp'
                 inp_parser[scan_param['section']][scan_param['parameter']] = param_value
@@ -235,7 +236,8 @@ def submit_job(config_file, dryrun_fl=False):
                     'notes': ''
                 })
     else:
-        shutil.rmtree(output_dir)
+        if not dryrun_fl:
+            shutil.rmtree(output_dir)
 
 
 def process_scheduler_opts(machine, scheduler_opts):

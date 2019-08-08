@@ -297,14 +297,12 @@ class Spice(SimulationCode):
                 output_dir.mkdir(parents=True)
 
         elif output_dir.exists() and self.is_code_output_dir(output_dir):
-            # If restarting make a backup of the existing directory and run from there
-            restart_dir = find_next_available_dir(Path(f"{output_dir}_restart"))
-            print(f"Restarting {self.name} run in directory {restart_dir}, leave a backup of start files in "
-                  f"{output_dir} \n")
+            output_dir = self.restart_io(output_dir, dryrun_fl)
 
-            if not dryrun_fl:
-                shutil.copy(output_dir, restart_dir)
-            output_dir = restart_dir
+        elif output_dir.exists and output_dir.is_dir():
+            print(f"WARNING: Directory {output_dir} doesn't look like a {self.name} simulation output folder.\n"
+                  f"Will continue anyway.\n")
+            output_dir = self.restart_io(output_dir, dryrun_fl)
 
         elif output_dir.exists() and not output_dir.is_dir():
             raise ValueError(f'Desired directory ({output_dir}) is not a {self.name} directory and therefore not '
@@ -312,4 +310,15 @@ class Spice(SimulationCode):
         else:
             raise FileNotFoundError(f'No directory found to restart at {output_dir} \n')
 
+        return output_dir
+
+    def restart_io(self, output_dir, dryrun_fl):
+        # If restarting make a backup of the existing directory and run from there
+        restart_dir = find_next_available_dir(Path(f"{output_dir}_restart"))
+        print(f"Restarting {self.name} run in directory {restart_dir}, leaving a backup of start files in "
+              f"{output_dir} \n")
+
+        if not dryrun_fl:
+            shutil.copytree(output_dir, restart_dir)
+        output_dir = restart_dir
         return output_dir
