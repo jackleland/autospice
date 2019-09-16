@@ -191,7 +191,7 @@ class PBS(Scheduler):
             'email':            '#PBS -M {}',
             'email_events':     '#PBS -m {}'
         }
-        super().__init__('PBS', parameter_mappings, script_ext='.pbs', script_lang='bash')
+        super().__init__('PBS', parameter_mappings, script_ext='.pbs', script_lang='bash', default_email_settings='abe')
 
 
 class Loadleveller(Scheduler):
@@ -220,7 +220,8 @@ class Loadleveller(Scheduler):
             'email':            '# @ notify_user = {}',
             'email_events':     '# @ notification = {}'
         }
-        super().__init__('Loadleveller', parameter_mappings, script_ext='.pbs', script_lang='bash')
+        super().__init__('Loadleveller', parameter_mappings, script_ext='.pbs', script_lang='bash',
+                         default_email_settings='always')
 
     def get_submission_script_header(self, submission_params, executable=None, arguments=None):
         script_header = super().get_submission_script_header(submission_params)
