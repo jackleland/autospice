@@ -160,6 +160,8 @@ class Spice(SimulationCode):
         config_opts = call_params['config_opts']
 
         precall_str = (
+            'source $HOME/.bashrc\n'
+
             '\necho "Date is: $(env TZ=GB date)"\n'
             'echo "MPI version is: "\n'
             'echo ""\n'
@@ -211,7 +213,7 @@ class Spice(SimulationCode):
             f'BU_FOLDER="{output_dir}/backup_$(env TZ=GB date +"%Y%m%d-%H%M")"\n'
             'echo "Making backup of simulation data into $BU_FOLDER"\n'
             'mkdir "$BU_FOLDER"\n'
-            f'cp {output_dir}/* $BU_FOLDER\n\n'
+            f'cp {output_dir}/!(backup*) $BU_FOLDER\n\n'
         )
         return precall_str + call_str + postcall_str
 
