@@ -1,4 +1,5 @@
 from abc import ABC
+import collections
 
 
 class Scheduler(ABC):
@@ -62,6 +63,7 @@ class Scheduler(ABC):
         'bash': '#!/bin/bash',
         'sh': '#!/bin/sh'
     }
+    DEFAULT_JOINED_HEADER_LINES = None
 
     def __init__(self, name, parameter_mappings, script_ext='.sh', script_lang='bash', default_email_settings='ALL'):
         self.name = name
@@ -85,10 +87,9 @@ class Scheduler(ABC):
                                       f'implemented languages are {self.SCRIPT_LANGS.keys()}')
         self.script_lang = script_lang
         self.shebang = self.SCRIPT_LANGS[script_lang]
-
         self.default_email_settings = default_email_settings
 
-    def get_submission_script_header(self, submission_params, **kwargs):
+    def get_submission_script_header(self, submission_params, join_lines=DEFAULT_JOINED_HEADER_LINES, **kwargs):
         """
         The method in Scheduler which must be called to produce a submission
         script from the submission_param arg, which should be a dictionary with
@@ -114,9 +115,14 @@ class Scheduler(ABC):
         :param submission_params:   (dict) mapping of the above keys to their
                                     values, to be inserted into a submission
                                     file header.
+        :param join_lines:          (list) Sequence of parameter labels which
+                                    must be printed on the same line
+                                    sequentially. Lines are concatenated in the
+                                    order given, and inserted into the header
+                                    first.
         :return:                    (string) submission script header to be
                                     prepended to a submission file matching the
-                                    code execution commands
+                                    code execution commands.
 
         """
         if not isinstance(submission_params, dict):
@@ -133,8 +139,18 @@ class Scheduler(ABC):
 
         # Construct list of parameter-value mappings joined by new-line symbols
         param_value_list = [self.shebang]
+
+        # Optionally force some parameters to be on the same line.
+        if join_lines is not None and isinstance(join_lines, collections.Sequence) \
+                and set(join_lines).issubset(submission_params):
+            joined_line = ''
+            for jl_param in join_lines:
+                joined_line += self.parameter_mappings[jl_param].format(submission_params.pop(jl_param))
+            param_value_list.append(joined_line)
+
         param_value_list.extend([self.parameter_mappings[param].format(value)
                                  for param, value in submission_params.items()])
+
         # Append blank string so output ends in a new line
         param_value_list.append('')
 
@@ -176,12 +192,13 @@ class PBS(Scheduler):
         'memory',
         'initial_dir'
     }
+    DEFAULT_JOINED_HEADER_LINES = ('nodes', 'cpus_per_node')
 
     def __init__(self):
         parameter_mappings = {
             'job_name':         '#PBS -N {}',
             'nodes':            '#PBS -l nodes={}',
-            'cpus_per_node':    '#PBS -l ppn={}',
+            'cpus_per_node':    ':ppn={}',
             'walltime':         '#PBS -l walltime={}',
             'out_log':          '#PBS -o {}',
             'err_log':          '#PBS -e {}',
@@ -192,6 +209,9 @@ class PBS(Scheduler):
             'email_events':     '#PBS -m {}'
         }
         super().__init__('PBS', parameter_mappings, script_ext='.pbs', script_lang='bash', default_email_settings='abe')
+
+    def get_submission_script_header(self, submission_params, join_lines=DEFAULT_JOINED_HEADER_LINES, **kwargs):
+        return super().get_submission_script_header(submission_params, join_lines=join_lines, **kwargs)
 
 
 class Loadleveller(Scheduler):
