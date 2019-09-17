@@ -1,6 +1,7 @@
 from warnings import warn
 import scheduler as sch
 import math
+import collections
 
 
 class Machine(object):
@@ -15,7 +16,7 @@ class Machine(object):
         'pbs': sch.PBS()                        # Not finished yet, do not use.
     }
 
-    def __init__(self, name, cpus_per_node, memory_per_node, max_nodes, max_job_time, scheduler_name):
+    def __init__(self, name, cpus_per_node, memory_per_node, max_nodes, max_job_time, scheduler_name, modules=None):
         self.name = name
         self.max_cpus_per_node = cpus_per_node
         self.memory_per_node = memory_per_node
@@ -23,7 +24,14 @@ class Machine(object):
         self.max_job_time = max_job_time
         if scheduler_name.lower() not in self.SCHEDULERS:
             raise NotImplementedError('Specified queue type is not currently supported.')
-        self.scheduler = self.SCHEDULERS[scheduler_name]
+        self.scheduler = self.SCHEDULERS[scheduler_name.lower()]
+        self.modules = modules
+
+    def get_submission_script_modules(self):
+        if self.modules is not None and isinstance(self.modules, collections.Iterable):
+            return '\n' + '\n'.join([f'module load {module}' for module in self.modules]) + '\n\n'
+        else:
+            return '\n# NO MODULES REQUIRED\n\n'
 
     def get_safe_job_time(self):
         if self.max_job_time is not None:
@@ -108,4 +116,4 @@ class Machine(object):
 
 marconi_skl = Machine('Marconi', 48, 177, 64, 24, "slurm")
 marconi_skl_fuaspecial = Machine('Marconi', 48, 177, 64, 180, "slurm")
-cumulus = Machine('Cumulus', 32, 512, 16, None, "pbs")
+cumulus = Machine('Cumulus', 32, 512, 16, None, "pbs", modules=['ifort/2017.0.098', 'icc/2017.0.098'])

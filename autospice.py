@@ -306,7 +306,7 @@ def print_choices(scheduler_opts, code_opts, full_input, full_output, full_exe_p
 
 def write_job_script(submission_params, machine, code, call_params, multi_submission=False, label='', dryrun_fl=False):
     header = machine.scheduler.get_submission_script_header(submission_params)
-
+    modules = machine.get_submission_script_modules()
     body = code.get_submission_script_body(machine, call_params, multi_submission=multi_submission)
 
     if not dryrun_fl:
@@ -314,7 +314,7 @@ def write_job_script(submission_params, machine, code, call_params, multi_submis
         job_script.touch()
         job_script.write_text(header + body)
     else:
-        job_script = header + body
+        job_script = header + modules + body
 
     return job_script
 
