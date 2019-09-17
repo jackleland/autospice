@@ -312,7 +312,7 @@ def write_job_script(submission_params, machine, code, call_params, multi_submis
     if not dryrun_fl:
         job_script = Path(str(call_params['output_dir'] / f'melange{label}') + machine.scheduler.script_ext)
         job_script.touch()
-        job_script.write_text(header + body)
+        job_script.write_text(header + modules + body)
     else:
         job_script = header + modules + body
 
