@@ -1,0 +1,22 @@
+[scheduler]
+  job_name:   masalatest
+  machine:    cumulus
+  user:       jleland0
+  email:      j.leland@liverpool.ac.uk
+  walltime:   48:00:00
+  n_cpus:     96
+  nodes:      3
+  memory:     512
+
+[code]
+  bin:            /home/jleland/Spice/spice2/bin
+  input:          ./inputs/test/autospice_test.inp
+  output:         ./data/test/masalatest3/
+  executable:     spice-2.11-release.bin
+  code_name:      spice
+
+[spice]
+  spice_version:  2
+  verbose:        True
+  soft_restart:   False
+  full_restart:   True
