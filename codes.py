@@ -4,6 +4,7 @@ from pathlib import Path
 import pprint as pp
 from collections import OrderedDict
 from flopter.spice.inputparser import InputParser
+import flopter.spice.utils as sput
 from utils import find_next_available_dir
 
 LOG_PREFIX = 'log'
@@ -273,15 +274,7 @@ class Spice(SimulationCode):
 
     @staticmethod
     def is_code_output_dir(directory):
-        if not isinstance(directory, Path) and isinstance(directory, str):
-            directory = Path(directory)
-        if directory.is_dir():
-            return len([f.name for f in list(directory.glob('*[!.][!2][!d].mat'))
-                        if not f.name.startswith('t-')]) == 1 \
-                   and len(list(directory.glob('t-*[!0-9][!0-9].mat'))) == 1 \
-                   and len(list(directory.glob('t-*.mat'))) > 1
-        else:
-            return False
+        return sput.is_code_output_dir(directory)
 
     def directory_io(self, output_dir, config_opts, dryrun_fl):
         # Directory I/O for regular and restart runs. If regular 'spice' io, create directory; if restart, backup
