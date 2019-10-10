@@ -177,7 +177,7 @@ class Slurm(Scheduler):
             'out_log': '#SBATCH -o {}',
             'err_log': '#SBATCH -e {}',
             'queue': '#SBATCH -p {}',
-            'qos': '#SBATCH -qos={}',
+            'qos': '#SBATCH --qos={}',
             'account': '#SBATCH -A {}',
             'memory': '#SBATCH --mem={}gb',
             'email': '#SBATCH --mail-user={}',
