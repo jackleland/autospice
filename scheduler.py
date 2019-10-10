@@ -24,6 +24,7 @@ class Scheduler(ABC):
     - 'walltime'                        - Yes
     - 'out_log'                         - Yes
     - 'err_log'                         - Yes
+    - 'user'                            - No
     - 'queue'                           - No
     - 'qos'                             - No
     - 'memory'                          - No
@@ -52,6 +53,7 @@ class Scheduler(ABC):
         'err_log'
     }
     OPTIONAL_PARAMS = {
+        'user',
         'queue',
         'qos',
         'account',
@@ -89,6 +91,9 @@ class Scheduler(ABC):
         self.shebang = self.SCRIPT_LANGS[script_lang]
         self.default_email_settings = default_email_settings
 
+    def get_optional_submission_params(self, scheduler_opts):
+        return {param: scheduler_opts[param] for param in self.OPTIONAL_PARAMS if param in scheduler_opts}
+
     def get_submission_script_header(self, submission_params, join_lines=DEFAULT_JOINED_HEADER_LINES, **kwargs):
         """
         The method in Scheduler which must be called to produce a submission
@@ -105,6 +110,7 @@ class Scheduler(ABC):
         - 'err_log'
 
         optional:
+        - 'user'
         - 'queue'
         - 'qos'
         - 'memory'
@@ -176,7 +182,8 @@ class Slurm(Scheduler):
             'account': '#SBATCH -A {}',
             'memory': '#SBATCH --mem={}gb',
             'email': '#SBATCH --mail-user={}',
-            'email_events': '#SBATCH --mail-type={}'
+            'email_events': '#SBATCH --mail-type={}',
+            'user': '#SBATCH --uid{}'
         }
         super().__init__('Slurm', parameter_mappings, script_ext='.slurm', script_lang='bash')
 

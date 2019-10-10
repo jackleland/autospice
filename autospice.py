@@ -97,8 +97,9 @@ def submit_job(config_file, dryrun_fl=False):
     sim_code = SUPPORTED_CODES[code_name]
     machine = SUPPORTED_MACHINES[machine_name]
 
-    cpus_per_node, cpus_tot, email, job_name, memory_req, n_jobs, nodes, walltime = process_scheduler_opts(
-        machine, scheduler_opts)
+    # cpus_per_node, cpus_tot, email, job_name, memory_req, n_jobs, nodes, walltime = process_scheduler_opts(
+    #     machine, scheduler_opts)
+    submission_params, call_params, n_jobs = process_scheduler_opts(machine, scheduler_opts)
 
     # ---------------- Check Code Options ----------------
 
@@ -143,15 +144,22 @@ def submit_job(config_file, dryrun_fl=False):
         shutil.copy(input_file, output_dir)
         shutil.copy(config_file, output_dir)
 
-    print_choices(scheduler_opts, code_opts, executable_dir / input_file, executable_dir / output_dir,
-                  executable_dir / executable, cpus_tot, nodes)
+    call_params.update({
+        'executable': executable,
+        'executable_dir': executable_dir,
+        'output_dir': output_dir,
+        'input_file': input_file,
+        'config_opts': code_specific_opts
+    })
+
+    print_choices(submission_params, call_params, code_name, machine_name)
     sim_code.print_config_options(code_specific_opts)
 
     # TODO: This has been temporarily removed as the syntax has changed from Tom's example script.
     # git_check(executable)
 
-    input_file_base = input_file
     output_dir_base = output_dir
+    job_name_base = submission_params['job_name']
 
     if click.confirm('\nDo you want to continue?', default=True):
         for param_value in scan_param['values']:
@@ -167,27 +175,12 @@ def submit_job(config_file, dryrun_fl=False):
                     with open(input_file, 'w') as f:
                         inp_parser.write(f)
 
-            submission_params = {
-                'job_name': job_name,
-                'nodes': nodes,
-                'cpus_per_node': cpus_per_node,
-                'walltime': walltime,
-                'out_log': output_dir / f'{codes.LOG_PREFIX}.out',
-                'err_log': output_dir / f'{codes.LOG_PREFIX}.err',
-                'queue': scheduler_opts['queue'],
-                'memory': memory_req,
-                'account': scheduler_opts['account'],
-                'email': email,
-                'email_events': machine.scheduler.default_email_settings
-            }
-            call_params = {
-                'cpus_tot': cpus_tot,
-                'executable': executable,
-                'executable_dir': executable_dir,
-                'output_dir': output_dir,
-                'input_file': input_file,
-                'config_opts': code_specific_opts
-            }
+                submission_params['job_name'] = f'{job_name_base}_{param_value}'
+                submission_params['out_log'] = output_dir / f'{codes.LOG_PREFIX}.out'
+                submission_params['err_log'] = output_dir / f'{codes.LOG_PREFIX}.err'
+
+                call_params['output_dir'] = output_dir
+                call_params['input_file'] = input_file
 
             job_script = write_job_script(submission_params, machine, sim_code, call_params, label='_0',
                                           dryrun_fl=dryrun_fl)
@@ -226,13 +219,13 @@ def submit_job(config_file, dryrun_fl=False):
                 logger.update_log({
                     'machine': machine_name,
                     'job_number': jobs[0],
-                    'job_name': job_name,
+                    'job_name': submission_params['job_name'],
                     'input_file': str(input_file),
                     'masala_config': str(config_file),
-                    'nodes': nodes,
-                    'total_cores': cpus_tot,
-                    'memory_req': memory_req,
-                    'wtime_req': walltime,
+                    'nodes': submission_params['nodes'],
+                    'total_cores': call_params['cpus_tot'],
+                    'memory_req': submission_params['memory'] if 'memory' in submission_params else 'N/A',
+                    'wtime_req': submission_params['walltime'],
                     'notes': ''
                 })
     else:
@@ -240,12 +233,31 @@ def submit_job(config_file, dryrun_fl=False):
             shutil.rmtree(output_dir)
 
 
-def process_scheduler_opts(machine, scheduler_opts):
-    # TODO: This should be moved into Scheduler, with a specific section for implementation specific stuff and a
-    #       standard format outputted
+def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
+    """
+    Function for parsing teh config file and verifying the scheduler options for
+    passing to the submission script writer.
+
+    This is split into two parts: required and optional submission parameters
+    which are defined within the scheduler. Some of the required parameters need
+    to be calculated from information machine-relevant information, whereas some
+    can simply be read.
+
+    :param machine:         Machine object created in main autospice script
+    :param scheduler_opts:  (section/dict) The section titled 'scheduler' from
+                            the configparser containing necessary information
+                            for an equivalent dictionary.
+    :param safe_job_time_fl:    (boolean) Controls whether a 'safe' time is used
+                                for walltime (90% of maximum allowed on machine)
+                                to allow time for I/O to occur before job is
+                                killed
+    :return:                (dict) Submission parameters, in a dictionary
+    :return:                (dict) Call parameters, in a dictionary
+    :return:                (int) Number of jobs required to be run due to
+                            walltime limitations on the machine
+
+    """
     job_name = scheduler_opts['job_name']
-    email = scheduler_opts['email']
-    print(f"Job completion and error notifications will be sent to {email} \n")
 
     # Check if number of processors is sensible for this machine
     n_cpus = scheduler_opts['n_cpus']
@@ -263,44 +275,78 @@ def process_scheduler_opts(machine, scheduler_opts):
             raise TypeError("Can't use a non-integer number of CPUs")
         cpus_per_node = machine.check_nodes(n_cpus, nodes)
 
-    memory_req = int(scheduler_opts['memory'])
-    if memory_req > machine.memory_per_node * nodes:
-        # TODO: Memory should be able to be prioritised above maximising cpus_per_node
-        print(f"WARNING: Requested amount of memory exceeds the maximum available on {machine.name}. With {nodes} \n"
-              f"node(s) the maximum amount of available memory is {machine.memory_per_node * nodes}GB, the job will \n"
-              f"be submitted with this amount requested. To submit the job with {memory_req}GB of memory, you would \n"
-              f"require {int(math.ceil(memory_req / machine.memory_per_node))} nodes.\n")
-        memory_req = machine.memory_per_node * nodes
-
     # TODO: verify string is in correct format
     walltime = scheduler_opts['walltime']
-    n_jobs = machine.get_n_jobs(walltime, safe_job_time_fl=True)
+    n_jobs = machine.get_n_jobs(walltime, safe_job_time_fl=safe_job_time_fl)
     if n_jobs > 1:
         print(f"Walltime requested ({walltime}) exceeds the maximum available walltime for a single job on \n"
               f"{machine.name}. The job will be split into {n_jobs} to complete successfully.")
         walltime = f"{machine.max_job_time}:00:00"
 
-    return cpus_per_node, n_cpus, email, job_name, memory_req, n_jobs, nodes, walltime
+    optional_submission_params = machine.scheduler.get_optional_submission_params(scheduler_opts)
+
+    # Memory is a special case as it is optional by default but must be verified and possibly recalculated if given.
+    if 'memory' in scheduler_opts:
+        memory_req = int(scheduler_opts['memory'])
+        if memory_req > machine.memory_per_node * nodes:
+            # TODO: Memory should be able to be prioritised above maximising cpus_per_node
+            print(f"WARNING: Requested amount of memory exceeds the maximum available on {machine.name}. With {nodes}\n"
+                  f"node(s) the maximum amount of available memory is {machine.memory_per_node * nodes}GB, the job \n"
+                  f"will be submitted with this amount requested. To submit the job with {memory_req}GB of memory, \n"
+                  f"you would require {int(math.ceil(memory_req / machine.memory_per_node))} nodes.\n")
+            memory_req = machine.memory_per_node * nodes
+        optional_submission_params['memory'] = memory_req
+
+    submission_params = {
+        'job_name': job_name,
+        'nodes': nodes,
+        'cpus_per_node': cpus_per_node,
+        'walltime': walltime,
+        **optional_submission_params
+    }
+
+    if 'email' in submission_params and 'email_events' not in submission_params:
+        submission_params['email_events'] = machine.scheduler.default_email_settings
+
+    call_params = {
+        'cpus_tot': n_cpus,
+    }
+
+    ignored_params = set(scheduler_opts.keys()) - set(submission_params.keys()) - {'n_cpus', 'machine'}
+    if len(ignored_params) > 0:
+        print(f'WARNING: The following parameters have not been implemented for the scheduler \n'
+              f'({machine.scheduler.name}) on {machine.name}: \n'
+              f'{ignored_params} \n\n'
+              f'These will therefore be ignored on this run.')
+
+    return submission_params, call_params, n_jobs
 
 
-def print_choices(scheduler_opts, code_opts, full_input, full_output, full_exe_path, cpus, nodes):
+def print_choices(submission_params, call_params, code_name, machine_name):
+    full_input = call_params['executable_dir'] / call_params['input_file']
+    full_output = call_params['executable_dir'] / call_params['output_dir']
+    full_exe = call_params['executable_dir'] / call_params['executable']
+
     print("\nChosen options for simulation run are:")
     options = OrderedDict([
-        ('Run name', scheduler_opts['job_name']),
-        ('Machine', scheduler_opts['machine']),
-        ('Code', code_opts['code_name']),
+        ('Run name', submission_params['job_name']),
+        ('Machine', machine_name),
+        ('Code', code_name),
         ('Input file path', str(full_input)),
         ('Output directory', str(full_output)),
-        ('Executable file path', str(full_exe_path)),
-        ('Queue', scheduler_opts['queue']),
-        ('Account', scheduler_opts['account']),
-        ('Walltime', scheduler_opts['walltime'])
+        ('Executable file path', str(full_exe)),
+        ('Walltime', submission_params['walltime'])
     ])
-    pprint(options)
-    print(f"\nWill use {str(cpus)} cpus across {str(nodes)} nodes")
+    if 'queue' in submission_params:
+        options.update({'Queue': submission_params['queue']})
+    if 'account' in submission_params:
+        options.update({'Account': submission_params['account']})
 
-    hrs, min, sec = (int(quantity) for quantity in scheduler_opts['walltime'].split(':'))
-    total_walltime = timedelta(hours=hrs, minutes=min, seconds=sec) * cpus
+    pprint(options)
+    print(f"\nWill use {call_params['cpus_tot']} cpus across {submission_params['nodes']} nodes")
+
+    hrs, min, sec = (int(quantity) for quantity in submission_params['walltime'].split(':'))
+    total_walltime = timedelta(hours=hrs, minutes=min, seconds=sec) * call_params['cpus_tot']
     print(f"Total CPU time requested is {format_timespan(total_walltime)}\n")
 
 
