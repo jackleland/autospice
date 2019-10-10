@@ -284,10 +284,16 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
     # TODO: verify string is in correct format
     walltime = scheduler_opts['walltime']
     n_jobs = machine.get_n_jobs(walltime, safe_job_time_fl=safe_job_time_fl)
-    if n_jobs > 1:
+    if n_jobs > 1 and not safe_job_time_fl:
         print(f"Walltime requested ({walltime}) exceeds the maximum available walltime for a single job on \n"
-              f"{machine.name} - which is {machine.max_job_time}. The job will be split into {n_jobs} to complete \n"
+              f"{machine.name} - which is {machine.max_job_time}hrs. The job will be split into {n_jobs} to complete \n"
               f"successfully.")
+        walltime = f"{machine.max_job_time}:00:00"
+    elif n_jobs > 1:
+        safe_job_time = machine.get_safe_job_time()
+        print(f"Walltime requested ({walltime}) exceeds the maximum available safe walltime for a single job on \n"
+              f"{machine.name} - which is {safe_job_time}hrs. The job will be split into {n_jobs} to complete \n"
+              f"successfully, but the requested time will remain {machine.max_job_time}:00:00 per job. \n")
         walltime = f"{machine.max_job_time}:00:00"
 
     optional_submission_params = machine.scheduler.get_optional_submission_params(scheduler_opts)
