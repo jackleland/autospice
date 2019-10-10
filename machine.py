@@ -3,6 +3,12 @@ import scheduler as sch
 import math
 import collections
 
+SCHEDULERS = {
+    'slurm': sch.Slurm(),
+    'loadleveller': sch.Loadleveller(),
+    'pbs': sch.PBS()
+}
+
 
 class Machine(object):
     """
@@ -10,21 +16,15 @@ class Machine(object):
     file creation method.
     """
 
-    SCHEDULERS = {
-        'slurm': sch.Slurm(),
-        'loadleveller': sch.Loadleveller(),     # Not finished yet, do not use.
-        'pbs': sch.PBS()                        # Not finished yet, do not use.
-    }
-
     def __init__(self, name, cpus_per_node, memory_per_node, max_nodes, max_job_time, scheduler_name, modules=None):
         self.name = name
         self.max_cpus_per_node = cpus_per_node
         self.memory_per_node = memory_per_node
         self.max_nodes = max_nodes
         self.max_job_time = max_job_time
-        if scheduler_name.lower() not in self.SCHEDULERS:
+        if scheduler_name.lower() not in SCHEDULERS:
             raise NotImplementedError('Specified queue type is not currently supported.')
-        self.scheduler = self.SCHEDULERS[scheduler_name.lower()]
+        self.scheduler = SCHEDULERS[scheduler_name.lower()]
         self.modules = modules
 
     def get_submission_script_modules(self):
