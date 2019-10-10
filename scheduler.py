@@ -185,7 +185,7 @@ class Slurm(Scheduler):
             'memory': '#SBATCH --mem={}gb',
             'email': '#SBATCH --mail-user={}',
             'email_events': '#SBATCH --mail-type={}',
-            'user': '#SBATCH --uid{}'
+            'user': '#SBATCH --uid={}'
         }
         super().__init__('Slurm', 'sbatch', parameter_mappings, script_ext='.slurm', script_lang='bash')
 
