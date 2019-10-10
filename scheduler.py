@@ -24,7 +24,6 @@ class Scheduler(ABC):
     - 'walltime'                        - Yes
     - 'out_log'                         - Yes
     - 'err_log'                         - Yes
-    - 'user'                            - No
     - 'queue'                           - No
     - 'qos'                             - No
     - 'memory'                          - No
@@ -53,7 +52,6 @@ class Scheduler(ABC):
         'err_log'
     }
     OPTIONAL_PARAMS = {
-        'user',
         'queue',
         'qos',
         'account',
@@ -112,7 +110,6 @@ class Scheduler(ABC):
         - 'err_log'
 
         optional:
-        - 'user'
         - 'queue'
         - 'qos'
         - 'memory'
@@ -184,8 +181,7 @@ class Slurm(Scheduler):
             'account': '#SBATCH -A {}',
             'memory': '#SBATCH --mem={}gb',
             'email': '#SBATCH --mail-user={}',
-            'email_events': '#SBATCH --mail-type={}',
-            'user': '#SBATCH --uid={}'
+            'email_events': '#SBATCH --mail-type={}'
         }
         super().__init__('Slurm', 'sbatch', parameter_mappings, script_ext='.slurm', script_lang='bash')
 

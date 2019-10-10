@@ -325,7 +325,7 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
         'cpus_tot': n_cpus,
     }
 
-    ignored_params = set(scheduler_opts.keys()) - set(submission_params.keys()) - {'n_cpus', 'machine'}
+    ignored_params = set(scheduler_opts.keys()) - set(submission_params.keys()) - {'n_cpus', 'machine', 'user'}
     if len(ignored_params) > 0:
         print(f'WARNING: The following parameters have not been implemented for the scheduler \n'
               f'({machine.scheduler.name}) on {machine.name}: \n'
