@@ -151,6 +151,10 @@ def submit_job(config_file, dryrun_fl=False):
         'input_file': input_file,
         'config_opts': code_specific_opts
     })
+    submission_params.update({
+        'out_log': output_dir / f'{codes.LOG_PREFIX}.out',
+        'err_log': output_dir / f'{codes.LOG_PREFIX}.err',
+    })
 
     print_choices(submission_params, call_params, code_name, machine_name)
     sim_code.print_config_options(code_specific_opts)
@@ -282,7 +286,8 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
     n_jobs = machine.get_n_jobs(walltime, safe_job_time_fl=safe_job_time_fl)
     if n_jobs > 1:
         print(f"Walltime requested ({walltime}) exceeds the maximum available walltime for a single job on \n"
-              f"{machine.name}. The job will be split into {n_jobs} to complete successfully.")
+              f"{machine.name} - which is {machine.max_job_time}. The job will be split into {n_jobs} to complete \n"
+              f"successfully.")
         walltime = f"{machine.max_job_time}:00:00"
 
     optional_submission_params = machine.scheduler.get_optional_submission_params(scheduler_opts)
