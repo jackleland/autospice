@@ -67,8 +67,10 @@ class Scheduler(ABC):
     }
     DEFAULT_JOINED_HEADER_LINES = None
 
-    def __init__(self, name, parameter_mappings, script_ext='.sh', script_lang='bash', default_email_settings='ALL'):
+    def __init__(self, name, submission_command, parameter_mappings, script_ext='.sh', script_lang='bash',
+                 default_email_settings='ALL'):
         self.name = name
+        self.submission_command = submission_command
 
         if not isinstance(parameter_mappings, dict):
             raise ValueError('parameter_mappings must be a dictionary')
@@ -185,7 +187,7 @@ class Slurm(Scheduler):
             'email_events': '#SBATCH --mail-type={}',
             'user': '#SBATCH --uid{}'
         }
-        super().__init__('Slurm', parameter_mappings, script_ext='.slurm', script_lang='bash')
+        super().__init__('Slurm', 'sbatch', parameter_mappings, script_ext='.slurm', script_lang='bash')
 
 
 class PBS(Scheduler):
@@ -215,7 +217,8 @@ class PBS(Scheduler):
             'email':            '#PBS -M {}',
             'email_events':     '#PBS -m {}'
         }
-        super().__init__('PBS', parameter_mappings, script_ext='.pbs', script_lang='bash', default_email_settings='abe')
+        super().__init__('PBS', 'qsub', parameter_mappings, script_ext='.pbs', script_lang='bash',
+                         default_email_settings='abe')
 
     def get_submission_script_header(self, submission_params, join_lines=DEFAULT_JOINED_HEADER_LINES, **kwargs):
         return super().get_submission_script_header(submission_params, join_lines=join_lines, **kwargs)
@@ -247,7 +250,7 @@ class Loadleveller(Scheduler):
             'email':            '# @ notify_user = {}',
             'email_events':     '# @ notification = {}'
         }
-        super().__init__('Loadleveller', parameter_mappings, script_ext='.pbs', script_lang='bash',
+        super().__init__('Loadleveller', 'llsubmit', parameter_mappings, script_ext='.pbs', script_lang='bash',
                          default_email_settings='always')
 
     def get_submission_script_header(self, submission_params, executable=None, arguments=None):

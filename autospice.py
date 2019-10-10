@@ -190,7 +190,7 @@ def submit_job(config_file, dryrun_fl=False):
                 print(f"Job script written as: \n"
                       f"{job_script}\n")
             else:
-                out = subprocess.check_output(['sbatch', str(job_script)])
+                out = subprocess.check_output([machine.scheduler.submission_command, str(job_script)])
                 *rest, job_num = str(out, 'utf-8').split(' ')
                 job_num = job_num.strip()
                 print(f"\nSubmitted job number {job_num}")
@@ -201,7 +201,9 @@ def submit_job(config_file, dryrun_fl=False):
                                                   multi_submission=True)
 
                     for i in range(n_jobs - 1):
-                        out = subprocess.check_output(['sbatch', '-d', f'afterany:{job_num}', str(job_script)])
+                        # TODO: (2019-10-10) This is only applicable to slurm, other implementations possible but this
+                        # TODO: is only currently necessary because of marconi's time limits.
+                        out = subprocess.check_output([machine.scheduler.submission_command, '-d', f'afterany:{job_num}', str(job_script)])
                         *rest, job_num = str(out, 'utf-8').split(' ')
                         job_num = job_num.strip()
                         print(f"\nSubmitted multisubmission {i}, job number {job_num}")
