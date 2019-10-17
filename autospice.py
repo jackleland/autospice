@@ -29,7 +29,8 @@ SUPPORTED_CODES = {
 @click.command()
 @click.argument('config_file', type=click.Path(exists=True))
 @click.option('--dryrun_fl', '-d', default=False, is_flag=True)
-def submit_job(config_file, dryrun_fl=False):
+@click.option('--safe_job_time_fl', '-s', default=True, is_flag=True)
+def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True):
     """
     Reads a YAML-like configuration file, writes a job script, and submits a
     simulation job based on the options contained in the file.
@@ -68,6 +69,13 @@ def submit_job(config_file, dryrun_fl=False):
     dryrun_fl : bool
         Boolean flag denoting whether a dry run is being performed or not. If
         performing a dry run no file i/o or submissions will take place.
+
+    safe_job_time_fl : bool
+        Boolean flag denoting whether a safe job time should be requested,
+        whereby only 90% of the maximum allowed job time on a machine is
+        requested to allow the remaining 10% to be used for I/O etc. This
+        hopefully stops the maximum allowed job time from interfering with the
+        simulation.
     """
 
     # Read and parse the config file
@@ -99,7 +107,8 @@ def submit_job(config_file, dryrun_fl=False):
 
     # cpus_per_node, cpus_tot, email, job_name, memory_req, n_jobs, nodes, walltime = process_scheduler_opts(
     #     machine, scheduler_opts)
-    submission_params, call_params, n_jobs = process_scheduler_opts(machine, scheduler_opts)
+    submission_params, call_params, n_jobs = process_scheduler_opts(machine, scheduler_opts,
+                                                                    safe_job_time_fl=safe_job_time_fl)
 
     # ---------------- Check Code Options ----------------
 
@@ -187,7 +196,7 @@ def submit_job(config_file, dryrun_fl=False):
                 call_params['input_file'] = input_file
 
             job_script = write_job_script(submission_params, machine, sim_code, call_params, label='_0',
-                                          dryrun_fl=dryrun_fl)
+                                          dryrun_fl=dryrun_fl, safe_job_time_fl=safe_job_time_fl)
 
             # Submit job script
             if dryrun_fl:
@@ -202,7 +211,7 @@ def submit_job(config_file, dryrun_fl=False):
                 jobs = [job_num, ]
                 if n_jobs > 1:
                     job_script = write_job_script(submission_params, machine, sim_code, call_params, label='_1',
-                                                  multi_submission=True)
+                                                  multi_submission=True, safe_job_time_fl=safe_job_time_fl)
 
                     for i in range(n_jobs - 1):
                         # TODO: (2019-10-10) This is only applicable to slurm, other implementations possible but this
@@ -363,10 +372,12 @@ def print_choices(submission_params, call_params, code_name, machine_name):
     print(f"Total CPU time requested is {format_timespan(total_walltime)}\n")
 
 
-def write_job_script(submission_params, machine, code, call_params, multi_submission=False, label='', dryrun_fl=False):
+def write_job_script(submission_params, machine, code, call_params, multi_submission=False, label='', dryrun_fl=False,
+                     safe_job_time_fl=True):
     header = machine.scheduler.get_submission_script_header(submission_params)
     modules = machine.get_submission_script_modules()
-    body = code.get_submission_script_body(machine, call_params, multi_submission=multi_submission)
+    body = code.get_submission_script_body(machine, call_params, multi_submission=multi_submission,
+                                           safe_job_time_fl=safe_job_time_fl)
 
     if not dryrun_fl:
         job_script = Path(str(call_params['output_dir'] / f'melange{label}') + machine.scheduler.script_ext)
