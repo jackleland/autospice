@@ -3,7 +3,7 @@
   machine:    marconi
   user:       jleland0
   email:      j.leland@liverpool.ac.uk
-  walltime:   48:00:00
+  walltime:   1:15:00
   queue:      skl_fua_prod
   account:    FUA33_FMPSPICE
   n_cpus:     96
@@ -19,6 +19,7 @@
 
 [spice]
   spice_version:  2
+  time_limit:     1
   verbose:        True
   soft_restart:   False
-  full_restart:   True
+  full_restart:   False

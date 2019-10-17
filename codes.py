@@ -17,33 +17,39 @@ class SimulationCode(abc.ABC):
     """
     SUBCLASS_COUNT = 0
 
-    def __init__(self, name, config_file_labels, boolean_labels=None):
+    def __init__(self, name, mandatory_config_labels, optional_config_labels=None, boolean_config_labels=None):
         self.name = name
-        self.config_file_labels = config_file_labels
-        if boolean_labels and set(self.config_file_labels).issuperset(set(boolean_labels)):
-            self.boolean_labels = boolean_labels
+        self.mandatory_config_labels = mandatory_config_labels
+
+        if optional_config_labels is not None:
+            self.optional_config_labels = set(optional_config_labels)
+        else:
+            self.optional_config_labels = set()
+
+        self.all_config_labels = set(self.mandatory_config_labels) | self.optional_config_labels
+
+        if boolean_config_labels and self.all_config_labels.issuperset(set(boolean_config_labels)):
+            self.boolean_labels = boolean_config_labels
         else:
             self.boolean_labels = set()
         SimulationCode.increment_counter()
 
     def process_config_options(self, config_opts):
-        # Verify that the length of the config opts is correct
-        if len(config_opts) != len(self.config_file_labels):
-            raise ValueError('The options in the config file do not match those specified in '
-                             'the code\'s definition. The config file should contain only these '
-                             f'options: {self.config_file_labels} under the heading {self.name}')
+        all_config_labels = set(self.mandatory_config_labels) | self.optional_config_labels
 
-        # Check that each value in the config file matches the defined values
-        for defined_label in self.config_file_labels:
-            if defined_label not in config_opts:
-                raise ValueError(f'The option {defined_label} was not found in the config file.'
-                                 f'The config file should contain all of these options: '
-                                 f'{self.config_file_labels} under the heading {self.name}')
+        # Verify that all mandatory options are present
+        if not set(self.mandatory_config_labels).issubset(config_opts.keys()):
+            raise ValueError('The options in the config file do not match those specified in the code\'s definition. \n'
+                             f'The config file should contain all mandatory options ({self.mandatory_config_labels}) '
+                             f'under the heading "{self.name}". \nMissing params: '
+                             f'{set(self.mandatory_config_labels) - set(config_opts)}')
+
+        # Verify that no undefined options were added in
         for label in config_opts:
-            if label not in self.config_file_labels:
-                raise ValueError(f'An interloper option {label} was found in the config file.'
+            if label not in all_config_labels:
+                raise ValueError(f'An interloper option ({label}) was found in the config file. \n'
                                  f'The config file should contain only these options: '
-                                 f'{self.config_file_labels} under the heading {self.name}')
+                                 f'{all_config_labels} under the heading "{self.name}"')
 
         # Set strings to bools if appropriate
         if self.boolean_labels:
@@ -110,7 +116,8 @@ class Spice(SimulationCode):
     def __init__(self):
         super().__init__('spice',
                          ('spice_version', 'verbose', 'soft_restart', 'full_restart'),
-                         boolean_labels=('verbose', 'soft_restart', 'full_restart'))
+                         optional_config_labels=('time_limit', ),
+                         boolean_config_labels=('verbose', 'soft_restart', 'full_restart'))
 
     def process_config_options(self, config_opts):
         config_opts = super().process_config_options(config_opts)
@@ -126,6 +133,17 @@ class Spice(SimulationCode):
                              'you would like to restart a simulation. Full restart uses all available information'
                              'to restart the run (including diagnostics) and soft restart will only use '
                              'particle positions, velocities and the iteration count.')
+
+        if 'time_limit' in config_opts:
+            try:
+                time_limit = int(config_opts['time_limit'])
+                if not time_limit > 0:
+                    raise ValueError()
+            except ValueError:
+                raise ValueError('The "time_limit" optional code config option must be a positive, integer number '
+                                 'of hours.')
+            print(f'WARNING: You have specified a hard time limit on spice of {time_limit}hrs. This will override the '
+                  f'time set by --safe_job_time_fl.')
         return config_opts
 
     def print_config_options(self, config_opts):
@@ -139,6 +157,9 @@ class Spice(SimulationCode):
         if restart_type is not None:
             option_list.append(('Restart type', restart_type))
 
+        if 'time_limit' in config_opts:
+            option_list.append(('Spice time limit', config_opts['time_limit'] + ' hr(s)'))
+
         print('SPICE specific options are:')
         pp.pprint(OrderedDict(option_list))
 
@@ -146,9 +167,10 @@ class Spice(SimulationCode):
         # Read restart mode in argument format
         restart_arg = self.get_restart_mode(config_opts)
         verbose_arg = '-v' if config_opts['verbose'] else None
+        time_limit = f'-l {int(config_opts["time_limit"])}' if 'time_limit' in config_opts else None
 
         # Only return arguments which are set
-        cl_args = [restart_arg, verbose_arg]
+        cl_args = [restart_arg, verbose_arg, time_limit]
         return [arg for arg in cl_args if arg is not None]
 
     def get_submission_script_body(self, machine, call_params, multi_submission=False, safe_job_time_fl=True):
@@ -191,7 +213,7 @@ class Spice(SimulationCode):
         if multi_submission and not Spice.is_restart(config_opts):
             config_file_args.append('-c')
 
-        if machine.max_job_time is not None and safe_job_time_fl:
+        if 'time_limit' not in config_opts and machine.max_job_time is not None and safe_job_time_fl:
             config_file_args.append(f'-l {machine.get_safe_job_time()}')
 
         mpirun_command = ' '.join(['mpirun', '-np', str(cpus_tot), str(executable_dir / executable),
