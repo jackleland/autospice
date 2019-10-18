@@ -211,7 +211,7 @@ class Spice(SimulationCode):
 
         config_file_args = self.get_command_line_args(config_opts)
         if multi_submission and not Spice.is_restart(config_opts):
-            config_file_args.append('-c')
+            config_file_args.append('-r')
 
         if 'time_limit' not in config_opts and machine.max_job_time is not None and safe_job_time_fl:
             config_file_args.append(f'-l {machine.get_safe_job_time()}')
@@ -230,7 +230,8 @@ class Spice(SimulationCode):
         )
 
         postcall_str = (
-            f'\n\ncat {output_dir / LOG_PREFIX}.out >> {output_dir / LOG_PREFIX}.ongoing.out\n'
+            f'\n\nsleep 600 \n'
+            f'cat {output_dir / LOG_PREFIX}.out >> {output_dir / LOG_PREFIX}.ongoing.out\n'
             f'cat {output_dir / LOG_PREFIX}.err >> {output_dir / LOG_PREFIX}.ongoing.err\n\n'
 
             f'BU_FOLDER="{output_dir}/backup_$(env TZ=GB date +"%Y%m%d-%H%M")"\n'
