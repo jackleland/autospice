@@ -30,7 +30,8 @@ SUPPORTED_CODES = {
 @click.argument('config_file', type=click.Path(exists=True))
 @click.option('--dryrun_fl', '-d', default=False, is_flag=True)
 @click.option('--safe_job_time_fl', '-s', default=True, is_flag=True)
-def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True):
+@click.option('--backup_fl', '-b', default=True, is_flag=True)
+def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=True):
     """
     Reads a YAML-like configuration file, writes a job script, and submits a
     simulation job based on the options contained in the file.
@@ -76,6 +77,11 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True):
         requested to allow the remaining 10% to be used for I/O etc. This
         hopefully stops the maximum allowed job time from interfering with the
         simulation.
+
+    backup_fl : bool
+        Boolean flag denoting whether simulation directory should be
+        periodically backed up. This will usually be useful at the end of a
+        simulation on a machine with a limited job time e.g. Marconi
     """
 
     # Read and parse the config file
@@ -196,7 +202,7 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True):
                 call_params['input_file'] = input_file
 
             job_script = write_job_script(submission_params, machine, sim_code, call_params, label='_0',
-                                          dryrun_fl=dryrun_fl, safe_job_time_fl=safe_job_time_fl)
+                                          dryrun_fl=dryrun_fl, safe_job_time_fl=safe_job_time_fl, backup_fl=backup_fl)
 
             # Submit job script
             if dryrun_fl:
@@ -211,12 +217,14 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True):
                 jobs = [job_num, ]
                 if n_jobs > 1:
                     job_script = write_job_script(submission_params, machine, sim_code, call_params, label='_1',
-                                                  multi_submission=True, safe_job_time_fl=safe_job_time_fl)
+                                                  multi_submission=True, safe_job_time_fl=safe_job_time_fl,
+                                                  backup_fl=backup_fl)
 
                     for i in range(n_jobs - 1):
                         # TODO: (2019-10-10) This is only applicable to slurm, other implementations possible but this
                         # TODO: is only currently necessary because of marconi's time limits.
-                        out = subprocess.check_output([machine.scheduler.submission_command, '-d', f'afterany:{job_num}', str(job_script)])
+                        out = subprocess.check_output([machine.scheduler.submission_command, '-d',
+                                                       f'afterany:{job_num}', str(job_script)])
                         *rest, job_num = str(out, 'utf-8').split(' ')
                         job_num = job_num.strip()
                         print(f"\nSubmitted multisubmission {i}, job number {job_num}")
@@ -373,11 +381,11 @@ def print_choices(submission_params, call_params, code_name, machine_name):
 
 
 def write_job_script(submission_params, machine, code, call_params, multi_submission=False, label='', dryrun_fl=False,
-                     safe_job_time_fl=True):
+                     safe_job_time_fl=True, backup_fl=True):
     header = machine.scheduler.get_submission_script_header(submission_params)
     modules = machine.get_submission_script_modules()
     body = code.get_submission_script_body(machine, call_params, multi_submission=multi_submission,
-                                           safe_job_time_fl=safe_job_time_fl)
+                                           safe_job_time_fl=safe_job_time_fl, backup_fl=backup_fl)
 
     if not dryrun_fl:
         job_script = Path(str(call_params['output_dir'] / f'melange{label}') + machine.scheduler.script_ext)

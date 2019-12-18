@@ -173,7 +173,8 @@ class Spice(SimulationCode):
         cl_args = [restart_arg, verbose_arg, time_limit]
         return [arg for arg in cl_args if arg is not None]
 
-    def get_submission_script_body(self, machine, call_params, multi_submission=False, safe_job_time_fl=True):
+    def get_submission_script_body(self, machine, call_params, multi_submission=False, safe_job_time_fl=True,
+                                   backup_fl=True):
         # TODO: This should be replaced with either kwargs or an object
         cpus_tot = call_params['cpus_tot']
         executable = call_params['executable']
@@ -237,8 +238,10 @@ class Spice(SimulationCode):
             f'BU_FOLDER="{output_dir}/backup_$(env TZ=GB date +"%Y%m%d-%H%M")"\n'
             'echo "Making backup of simulation data into $BU_FOLDER"\n'
             'mkdir "$BU_FOLDER"\n'
-            f"rsync -azvp --exclude='backup*' {output_dir}/* $BU_FOLDER"
+            f"rsync -azvp --exclude='backup*' {output_dir}/{t_file}.mat $BU_FOLDER\n"
         )
+        if backup_fl:
+            postcall_str += f"rsync -azvp --exclude='backup*' {output_dir}/* $BU_FOLDER\n"
         return precall_str + call_str + postcall_str
 
     @classmethod
