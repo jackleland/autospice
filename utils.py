@@ -11,7 +11,7 @@ def find_next_available_dir(directory):
     dummy_dir = directory
     while dummy_dir.exists():
         i += 1
-        dummy_dir = dummy_dir.parent / Path(f"{directory.stem}{i}")
+        dummy_dir = dummy_dir.parent / Path(f"{directory.stem}_{i}_")
     return dummy_dir
 
 # TODO: This has been temporarily removed due to the git repo object not being present.
