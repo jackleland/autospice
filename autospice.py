@@ -31,7 +31,9 @@ SUPPORTED_CODES = {
 @click.option('--dryrun_fl', '-d', default=False, is_flag=True)
 @click.option('--safe_job_time_fl', '-s', default=True, is_flag=True)
 @click.option('--backup_fl', '-b', default=True, is_flag=True)
-def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=True):
+@click.option('--restart_copy_mode', '-r', default='1', type=click.Choice(['0', '1', '2', '3', 'none', 'new', 'stay_in',
+                                                                           'stay_out']))
+def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=True, restart_copy_mode='1'):
     """
     Reads a YAML-like configuration file, writes a job script, and submits a
     simulation job based on the options contained in the file.
@@ -82,6 +84,30 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
         Boolean flag denoting whether simulation directory should be
         periodically backed up. This will usually be useful at the end of a
         simulation on a machine with a limited job time e.g. Marconi
+
+    restart_copy_mode: int / str
+        Option to select the type of copying that happens on restart as a means
+        of making a backup of the simulation directory being restarted. Options
+        are:
+         - 0 or 'none':     No copying done upon restart
+         - 1 or 'new':      Directory contents copied to a new directory named
+                            [directory]_restart (or, if this already exists,
+                            iterations thereof with appended ascending
+                            integers). The simulation then runs in this newly
+                            created directory. [DEFAULT]
+         - 2 or 'stay_out': Directory contents copied to a new directory named
+                            [directory]_at_restart (or, if this already exists,
+                            iterations thereof with appended ascending
+                            integers). The simulation then runs in the original
+                            directory.
+         - 3 or 'stay_in':  Directory contents copied to a new directory, within
+                            the restarting directory, named with the current
+                            date and time in the format
+                            'backup_at_restart_[YYYYMMDD-HHMM]. The simulation
+                            then runs in the original directory.
+        The copying in all of these options ignores any folders within the
+        original directory starting with 'backup'. Default is 1.
+
     """
 
     # Read and parse the config file
@@ -154,7 +180,7 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
         inp_parser = None
 
     code_specific_opts = sim_code.process_config_options(config[code_name])
-    output_dir = sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl)
+    output_dir = sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl, restart_copy_mode=restart_copy_mode)
     if not dryrun_fl:
         shutil.copy(input_file, output_dir)
         shutil.copy(config_file, output_dir)
