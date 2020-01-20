@@ -1,5 +1,6 @@
 import abc
 import shutil
+import datetime
 from pathlib import Path
 import pprint as pp
 from collections import OrderedDict
@@ -87,7 +88,7 @@ class SimulationCode(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def directory_io(self, output_dir, config_opts, dryrun_fl):
+    def directory_io(self, output_dir, config_opts, dryrun_fl, restart_copy_mode=1):
         pass
 
     @classmethod
@@ -112,12 +113,17 @@ class Spice(SimulationCode):
             'Restart with particle information and diagnostics'
         )
     }
+    VERSION_LOG_PERCENTAGE_COLS = {
+        2: '$1',
+        3: '$2',
+    }
 
     def __init__(self):
         super().__init__('spice',
                          ('spice_version', 'verbose', 'soft_restart', 'full_restart'),
                          optional_config_labels=('time_limit', ),
                          boolean_config_labels=('verbose', 'soft_restart', 'full_restart'))
+        self.version = None
 
     def process_config_options(self, config_opts):
         config_opts = super().process_config_options(config_opts)
@@ -127,6 +133,7 @@ class Spice(SimulationCode):
         spice_version = config_opts['spice_version']
         if int(spice_version) not in [2, 3]:
             raise ValueError(f'spice_version given ({spice_version}) was not valid, must be either 2 or 3.')
+        self.version = spice_version
         soft_restart, full_restart = config_opts.getboolean('soft_restart'), config_opts.getboolean('full_restart')
         if soft_restart and full_restart:
             raise ValueError('The soft and full reset flags were both set to true, please select only one if '
@@ -174,7 +181,7 @@ class Spice(SimulationCode):
         return [arg for arg in cl_args if arg is not None]
 
     def get_submission_script_body(self, machine, call_params, multi_submission=False, safe_job_time_fl=True,
-                                   backup_fl=True):
+                                   backup_fl=True, spice_version=None):
         # TODO: This should be replaced with either kwargs or an object
         cpus_tot = call_params['cpus_tot']
         executable = call_params['executable']
@@ -182,6 +189,13 @@ class Spice(SimulationCode):
         output_dir = call_params['output_dir']
         input_file = call_params['input_file']
         config_opts = call_params['config_opts']
+
+        if spice_version not in self.VERSION_LOG_PERCENTAGE_COLS:
+            if self.version is not None:
+                spice_version = self.version
+            else:
+                spice_version = 2
+        version_log_percent_col = self.VERSION_LOG_PERCENTAGE_COLS[spice_version]
 
         precall_str = (
             'source $HOME/.bashrc\n'
@@ -242,6 +256,19 @@ class Spice(SimulationCode):
         )
         if backup_fl:
             postcall_str += f"rsync -azvp --exclude='backup*' {output_dir}/* $BU_FOLDER\n"
+
+        # Cancel all subsequent jobs if it looks like the simulation has finished
+        postcall_str += (
+            "\n"
+            "if (( $(cat log.ongoing.out | grep '% ' | tail -n 1 | awk '{print "
+            f"{version_log_percent_col}"
+            "}') >= 99 ))\n"
+            "then \n"
+            "\tscancel $(cat jobs.txt)\n "
+            "fi\n"
+
+        )
+
         return precall_str + call_str + postcall_str
 
     @classmethod
@@ -302,7 +329,7 @@ class Spice(SimulationCode):
     def is_code_output_dir(directory):
         return sput.is_code_output_dir(directory)
 
-    def directory_io(self, output_dir, config_opts, dryrun_fl):
+    def directory_io(self, output_dir, config_opts, dryrun_fl, restart_copy_mode=1):
         # Directory I/O for regular and restart runs. If regular 'spice' io, create directory; if restart, backup
         # directory before starting run.
         restart_fl = self.is_restart(config_opts)
@@ -318,12 +345,12 @@ class Spice(SimulationCode):
                 output_dir.mkdir(parents=True)
 
         elif output_dir.exists() and self.is_code_output_dir(output_dir):
-            output_dir = self.restart_io(output_dir, dryrun_fl)
+            output_dir = self.restart_io(output_dir, dryrun_fl, restart_copy_mode)
 
-        elif output_dir.exists and output_dir.is_dir():
+        elif output_dir.exists() and output_dir.is_dir():
             print(f"WARNING: Directory {output_dir} doesn't look like a {self.name} simulation output folder.\n"
                   f"Will continue anyway.\n")
-            output_dir = self.restart_io(output_dir, dryrun_fl)
+            output_dir = self.restart_io(output_dir, dryrun_fl, restart_copy_mode)
 
         elif output_dir.exists() and not output_dir.is_dir():
             raise ValueError(f'Desired directory ({output_dir}) is not a {self.name} directory and therefore not '
@@ -333,13 +360,39 @@ class Spice(SimulationCode):
 
         return output_dir
 
-    def restart_io(self, output_dir, dryrun_fl):
-        # If restarting make a backup of the existing directory and run from there
-        restart_dir = find_next_available_dir(Path(f"{output_dir}_restart"))
-        print(f"Restarting {self.name} run in directory {restart_dir}, leaving a backup of start files in "
-              f"{output_dir} \n")
+    def restart_io(self, output_dir, dryrun_fl, restart_copy_mode):
+        # If restarting, copy files depending on the copy mode passed.
+        if restart_copy_mode in ['0', 'none']:
+            # Make no backup, run in the original directory
+            print(f"You've opted not to backup the restart directory")
+            return output_dir
+        elif restart_copy_mode in ['1', 'new']:
+            # Make a backup of the original directory and run from the backup
+            restart_dir = find_next_available_dir(Path(f"{output_dir}_restart"))
+            print(f"Restarting {self.name} run in directory {restart_dir}, leaving a backup of start files in "
+                  f"{output_dir} \n")
 
-        if not dryrun_fl:
-            shutil.copytree(output_dir, restart_dir)
-        output_dir = restart_dir
-        return output_dir
+            if not dryrun_fl:
+                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
+            return restart_dir
+        elif restart_copy_mode in ['2', 'stay_out']:
+            # Make a backup of the original directory and run from the original directory
+            restart_dir = find_next_available_dir(Path(f"{output_dir}_at_restart"))
+            print(f"Restarting {self.name} run in directory {output_dir}, making a backup of start files in "
+                  f"{restart_dir} \n")
+
+            if not dryrun_fl:
+                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
+            return output_dir
+        elif restart_copy_mode in ['3', 'stay_in']:
+            # Make a backup of the original directory inside the original directory and run from original directory
+            datetime_str = datetime.datetime.today().strftime('%Y%m%d-%H%M')
+            restart_dir = find_next_available_dir(output_dir / f'backup_at_restart_{datetime_str}')
+            print(f"Restarting {self.name} run in directory {output_dir}, making a backup of start files in "
+                  f"{restart_dir} \n")
+
+            if not dryrun_fl:
+                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
+            return output_dir
+        else:
+            raise ValueError('Invalid restart copy mode selected, see documentation for proper usage.')

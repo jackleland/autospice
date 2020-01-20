@@ -11,7 +11,7 @@
   memory:     512
 
 [code]
-  bin:            /home/jleland/Spice/spice2/bin
+  bin:            /home/jleland/spice/spice2/bin
   input:          ./inputs/test/autospice_test.inp
   output:         ./data/test/masalatest3/
   executable:     spice-2.11-release.bin
@@ -22,4 +22,4 @@
   time_limit:     1
   verbose:        True
   soft_restart:   False
-  full_restart:   False
+  full_restart:   True
