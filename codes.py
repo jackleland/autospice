@@ -113,12 +113,17 @@ class Spice(SimulationCode):
             'Restart with particle information and diagnostics'
         )
     }
+    VERSION_LOG_PERCENTAGE_COLS = {
+        2: '$1',
+        3: '$2',
+    }
 
     def __init__(self):
         super().__init__('spice',
                          ('spice_version', 'verbose', 'soft_restart', 'full_restart'),
                          optional_config_labels=('time_limit', ),
                          boolean_config_labels=('verbose', 'soft_restart', 'full_restart'))
+        self.version = None
 
     def process_config_options(self, config_opts):
         config_opts = super().process_config_options(config_opts)
@@ -128,6 +133,7 @@ class Spice(SimulationCode):
         spice_version = config_opts['spice_version']
         if int(spice_version) not in [2, 3]:
             raise ValueError(f'spice_version given ({spice_version}) was not valid, must be either 2 or 3.')
+        self.version = spice_version
         soft_restart, full_restart = config_opts.getboolean('soft_restart'), config_opts.getboolean('full_restart')
         if soft_restart and full_restart:
             raise ValueError('The soft and full reset flags were both set to true, please select only one if '
@@ -175,7 +181,7 @@ class Spice(SimulationCode):
         return [arg for arg in cl_args if arg is not None]
 
     def get_submission_script_body(self, machine, call_params, multi_submission=False, safe_job_time_fl=True,
-                                   backup_fl=True):
+                                   backup_fl=True, spice_version=None):
         # TODO: This should be replaced with either kwargs or an object
         cpus_tot = call_params['cpus_tot']
         executable = call_params['executable']
@@ -183,6 +189,13 @@ class Spice(SimulationCode):
         output_dir = call_params['output_dir']
         input_file = call_params['input_file']
         config_opts = call_params['config_opts']
+
+        if spice_version not in self.VERSION_LOG_PERCENTAGE_COLS:
+            if self.version is not None:
+                spice_version = self.version
+            else:
+                spice_version = 2
+        version_log_percent_col = self.VERSION_LOG_PERCENTAGE_COLS[spice_version]
 
         precall_str = (
             'source $HOME/.bashrc\n'
@@ -243,6 +256,19 @@ class Spice(SimulationCode):
         )
         if backup_fl:
             postcall_str += f"rsync -azvp --exclude='backup*' {output_dir}/* $BU_FOLDER\n"
+
+        # Cancel all subsequent jobs if it looks like the simulation has finished
+        postcall_str += (
+            "\n"
+            "if (( $(cat log.ongoing.out | grep '% ' | tail -n 1 | awk '{print "
+            f"{version_log_percent_col}"
+            "}') >= 99 ))\n"
+            "then \n"
+            "\tscancel $(cat jobs.txt)\n "
+            "fi\n"
+
+        )
+
         return precall_str + call_str + postcall_str
 
     @classmethod
