@@ -130,8 +130,8 @@ class Spice(SimulationCode):
 
         # Spice specific verification
 
-        spice_version = config_opts['spice_version']
-        if int(spice_version) not in [2, 3]:
+        spice_version = int(config_opts['spice_version'])
+        if spice_version not in [2, 3]:
             raise ValueError(f'spice_version given ({spice_version}) was not valid, must be either 2 or 3.')
         self.version = spice_version
         soft_restart, full_restart = config_opts.getboolean('soft_restart'), config_opts.getboolean('full_restart')
@@ -264,7 +264,7 @@ class Spice(SimulationCode):
             f"{version_log_percent_col}"
             "}') >= 99 ))\n"
             "then \n"
-            "\tscancel $(cat jobs.txt)\n "
+            f"\tscancel $(cat {output_dir}/jobs.txt)\n"
             "fi\n"
 
         )
