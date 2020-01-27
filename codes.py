@@ -260,9 +260,8 @@ class Spice(SimulationCode):
         # Cancel all subsequent jobs if it looks like the simulation has finished
         postcall_str += (
             "\n"
-            "if (( $(cat log.ongoing.out | grep '% ' | tail -n 1 | awk '{print "
-            f"{version_log_percent_col}"
-            "}') >= 99 ))\n"
+            f"if (( $(cat {output_dir}/log.ongoing.out | grep '% ' | tail -n 1"
+            f" | awk '{{print {version_log_percent_col}}}') >= 99 ))\n"
             "then \n"
             f"\tscancel $(cat {output_dir}/jobs.txt)\n"
             "fi\n"
