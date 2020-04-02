@@ -12,8 +12,8 @@
 
 [code]
   bin:            /home/jleland/spice/spice2/bin
-  input:          ./inputs/test/autospice_test.inp
-  output:         ./data/test/masalatest3/
+  input:          ./inputs/lowdens_anglescan/angled_tiltscan_restart1.inp
+  output:         ./data_offline_0/lowdens_anglescan/angled_tiltscan
   executable:     spice-2.11-release.bin
   code_name:      spice
 

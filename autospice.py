@@ -169,6 +169,7 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
         raise FileNotFoundError(f"No executable file found at {executable}")
 
     if param_scan_fl:
+        # TODO: The use of an input parser is SPICE specific
         scan_param, inp_parser = sim_code.get_scanning_parameters(input_file)
         scan_param = scan_param[0]
         print(f"Submitting a parameter scan, scanning over \'{scan_param['parameter']}\' with the following values: \n")
@@ -180,10 +181,9 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
         inp_parser = None
 
     code_specific_opts = sim_code.process_config_options(config[code_name])
-    output_dir = sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl, restart_copy_mode=restart_copy_mode)
-    if not dryrun_fl:
-        shutil.copy(input_file, output_dir)
-        shutil.copy(config_file, output_dir)
+    restart_fl = sim_code.is_restart(code_specific_opts)
+    sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl=True, restart_copy_mode=restart_copy_mode,
+                          print_fl=True)
 
     call_params.update({
         'executable': executable,
@@ -207,12 +207,32 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
     job_name_base = submission_params['job_name']
 
     if click.confirm('\nDo you want to continue?', default=True):
-        for param_value in scan_param['values']:
-            if param_value is not None:
+        # Start parameter scan
+        for j, param_value in enumerate(scan_param['values']):
+            if param_value is None:
+                # If there are no parameters to scan then do output directory IO (creation and, if restart, backup)
+                # in the requested directory
+                output_dir = sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl, print_fl=False,
+                                                   restart_copy_mode=restart_copy_mode)
+                if not dryrun_fl:
+                    shutil.copy(input_file, output_dir)
+                    shutil.copy(config_file, output_dir)
+            else:
+                # If there are parameters to scan then run output directory IO in each parameter-specific folder.
+                if j == 0:
+                    if not restart_fl:
+                        output_dir_base = sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl,
+                                                                restart_copy_mode=restart_copy_mode, print_fl=False)
+                    if not dryrun_fl:
+                        shutil.copy(input_file, output_dir_base)
+                        shutil.copy(config_file, output_dir_base)
+
                 param_dir = f"{scan_param['parameter']}_{param_value}"
                 output_dir = output_dir_base / param_dir
-                if not dryrun_fl:
-                    os.makedirs(output_dir, exist_ok=True)
+
+                if restart_fl:
+                    sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl=True, print_fl=True,
+                                          restart_copy_mode=restart_copy_mode)
 
                 input_file = output_dir / 'input.inp'
                 inp_parser[scan_param['section']][scan_param['parameter']] = param_value
@@ -230,6 +250,10 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
             job_script = write_job_script(submission_params, machine, sim_code, call_params, label='_0',
                                           dryrun_fl=dryrun_fl, safe_job_time_fl=safe_job_time_fl, backup_fl=backup_fl)
 
+            job_script_multisubmission = write_job_script(submission_params, machine, sim_code, call_params, label='_1',
+                                                          multi_submission=True, safe_job_time_fl=safe_job_time_fl,
+                                                          backup_fl=backup_fl)
+
             # Submit job script
             if dryrun_fl:
                 print(f"Job script written as: \n"
@@ -242,18 +266,14 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
 
                 jobs = [job_num, ]
                 if n_jobs > 1:
-                    job_script = write_job_script(submission_params, machine, sim_code, call_params, label='_1',
-                                                  multi_submission=True, safe_job_time_fl=safe_job_time_fl,
-                                                  backup_fl=backup_fl)
-
                     for i in range(n_jobs - 1):
                         # TODO: (2019-10-10) This is only applicable to slurm, other implementations possible but this
                         # TODO: is only currently necessary because of marconi's time limits.
                         out = subprocess.check_output([machine.scheduler.submission_command, '-d',
-                                                       f'afterany:{job_num}', str(job_script)])
+                                                       f'afterany:{job_num}', str(job_script_multisubmission)])
                         *rest, job_num = str(out, 'utf-8').split(' ')
                         job_num = job_num.strip()
-                        print(f"\nSubmitted multisubmission {i}, job number {job_num}")
+                        print(f"\nSubmitted multisubmission {i+2}, job number {job_num}")
                         jobs.append(job_num)
 
                 with open(output_dir / 'jobs.txt', 'w') as f:

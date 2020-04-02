@@ -62,6 +62,43 @@ class SimulationCode(abc.ABC):
                                      f'The current value is {config_opts[boolean_label]}.')
         return config_opts
 
+    def copy_on_restart(self, output_dir, dryrun_fl, mode):
+        # If restarting, copy files depending on the copy mode passed.
+        if mode in ['0', 'none']:
+            # Make no backup, run in the original directory
+            print(f"You've opted not to backup the restart directory")
+            return output_dir
+        elif mode in ['1', 'new']:
+            # Make a backup of the original directory and run from the backup
+            restart_dir = find_next_available_dir(Path(f"{output_dir}_restart"))
+            print(f"Restarting {self.name} run in directory {restart_dir}, leaving a backup of start files in "
+                  f"{output_dir} \n")
+
+            if not dryrun_fl:
+                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
+            return restart_dir
+        elif mode in ['2', 'stay_out']:
+            # Make a backup of the original directory and run from the original directory
+            restart_dir = find_next_available_dir(Path(f"{output_dir}_at_restart"))
+            print(f"Restarting {self.name} run in directory {output_dir}, making a backup of start files in "
+                  f"{restart_dir} \n")
+
+            if not dryrun_fl:
+                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
+            return output_dir
+        elif mode in ['3', 'stay_in']:
+            # Make a backup of the original directory inside the original directory and run from original directory
+            datetime_str = datetime.datetime.today().strftime('%Y%m%d-%H%M')
+            restart_dir = find_next_available_dir(output_dir / f'backup_at_restart_{datetime_str}')
+            print(f"Restarting {self.name} run in directory {output_dir}, making a backup of start files in "
+                  f"{restart_dir} \n")
+
+            if not dryrun_fl:
+                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
+            return output_dir
+        else:
+            raise ValueError('Invalid restart copy mode selected, see documentation for proper usage.')
+
     @abc.abstractmethod
     def print_config_options(self, config_opts):
         pass
@@ -82,13 +119,18 @@ class SimulationCode(abc.ABC):
     def is_parameter_scan(self, input_file):
         pass
 
+    @classmethod
+    @abc.abstractmethod
+    def is_restart(cls, config_opts):
+        pass
+
     @staticmethod
     @abc.abstractmethod
     def is_code_output_dir(directory):
         pass
 
     @abc.abstractmethod
-    def directory_io(self, output_dir, config_opts, dryrun_fl, restart_copy_mode=1):
+    def directory_io(self, output_dir, config_opts, dryrun_fl, restart_copy_mode=1, print_fl=True):
         pass
 
     @classmethod
@@ -301,7 +343,8 @@ class Spice(SimulationCode):
             raise ValueError('Attempting multi-dimensional parameter scan, not currently supported')
         return len(scan_params) == 1
 
-    def get_scanning_parameters(self, input_file):
+    @staticmethod
+    def get_scanning_parameters(input_file):
         """
         Method for returning information about the parameters specified to be
         scanned. Returns a list of dictionaries with four entries for each
@@ -328,28 +371,31 @@ class Spice(SimulationCode):
     def is_code_output_dir(directory):
         return sput.is_code_output_dir(directory)
 
-    def directory_io(self, output_dir, config_opts, dryrun_fl, restart_copy_mode=1):
+    def directory_io(self, output_dir, config_opts, dryrun_fl, restart_copy_mode=0, print_fl=True):
         # Directory I/O for regular and restart runs. If regular 'spice' io, create directory; if restart, backup
         # directory before starting run.
         restart_fl = self.is_restart(config_opts)
         if not restart_fl:
             # If not restarting then check if the output folder exists already.
             if output_dir.exists() and output_dir.is_dir():
-                print(f"WARNING: {output_dir} already exists, searching for next available similar directory \n")
+                if print_fl:
+                    print(f"WARNING: {output_dir} already exists, searching for next available similar directory \n")
                 output_dir = find_next_available_dir(output_dir)
 
             # Create output directory
-            print(f"Using directory {output_dir} \n")
+            if print_fl:
+                print(f"Using directory {output_dir} \n")
             if not dryrun_fl:
                 output_dir.mkdir(parents=True)
 
         elif output_dir.exists() and self.is_code_output_dir(output_dir):
-            output_dir = self.restart_io(output_dir, dryrun_fl, restart_copy_mode)
+            output_dir = self.copy_on_restart(output_dir, dryrun_fl, restart_copy_mode)
 
         elif output_dir.exists() and output_dir.is_dir():
-            print(f"WARNING: Directory {output_dir} doesn't look like a {self.name} simulation output folder.\n"
-                  f"Will continue anyway.\n")
-            output_dir = self.restart_io(output_dir, dryrun_fl, restart_copy_mode)
+            if print_fl:
+                print(f"WARNING: Directory {output_dir} doesn't look like a {self.name} simulation output folder.\n"
+                      f"Will continue anyway.\n")
+            output_dir = self.copy_on_restart(output_dir, dryrun_fl, restart_copy_mode)
 
         elif output_dir.exists() and not output_dir.is_dir():
             raise ValueError(f'Desired directory ({output_dir}) is not a {self.name} directory and therefore not '
@@ -358,40 +404,3 @@ class Spice(SimulationCode):
             raise FileNotFoundError(f'No directory found to restart at {output_dir} \n')
 
         return output_dir
-
-    def restart_io(self, output_dir, dryrun_fl, restart_copy_mode):
-        # If restarting, copy files depending on the copy mode passed.
-        if restart_copy_mode in ['0', 'none']:
-            # Make no backup, run in the original directory
-            print(f"You've opted not to backup the restart directory")
-            return output_dir
-        elif restart_copy_mode in ['1', 'new']:
-            # Make a backup of the original directory and run from the backup
-            restart_dir = find_next_available_dir(Path(f"{output_dir}_restart"))
-            print(f"Restarting {self.name} run in directory {restart_dir}, leaving a backup of start files in "
-                  f"{output_dir} \n")
-
-            if not dryrun_fl:
-                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
-            return restart_dir
-        elif restart_copy_mode in ['2', 'stay_out']:
-            # Make a backup of the original directory and run from the original directory
-            restart_dir = find_next_available_dir(Path(f"{output_dir}_at_restart"))
-            print(f"Restarting {self.name} run in directory {output_dir}, making a backup of start files in "
-                  f"{restart_dir} \n")
-
-            if not dryrun_fl:
-                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
-            return output_dir
-        elif restart_copy_mode in ['3', 'stay_in']:
-            # Make a backup of the original directory inside the original directory and run from original directory
-            datetime_str = datetime.datetime.today().strftime('%Y%m%d-%H%M')
-            restart_dir = find_next_available_dir(output_dir / f'backup_at_restart_{datetime_str}')
-            print(f"Restarting {self.name} run in directory {output_dir}, making a backup of start files in "
-                  f"{restart_dir} \n")
-
-            if not dryrun_fl:
-                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
-            return output_dir
-        else:
-            raise ValueError('Invalid restart copy mode selected, see documentation for proper usage.')
