@@ -252,7 +252,7 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
 
             job_script_multisubmission = write_job_script(submission_params, machine, sim_code, call_params, label='_1',
                                                           multi_submission=True, safe_job_time_fl=safe_job_time_fl,
-                                                          backup_fl=backup_fl)
+                                                          dryrun_fl=dryrun_fl, backup_fl=backup_fl)
 
             # Submit job script
             if dryrun_fl:
