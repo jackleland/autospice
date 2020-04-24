@@ -239,6 +239,7 @@ class Spice(SimulationCode):
                 spice_version = 2
         version_log_percent_col = self.VERSION_LOG_PERCENTAGE_COLS[spice_version]
 
+        # TODO: (2020-04-24) This should probably be read in from an external bash file as opposed to being hardcoded
         precall_str = (
             'source $HOME/.bashrc\n'
 
@@ -279,12 +280,29 @@ class Spice(SimulationCode):
                                    '-i', str(input_file),
                                    '-t', str(t_file)
                                    ])
+
+        stitcher_command = ' '.join([
+            str(executable_dir / 'stitcher.bin'),
+            '-i', str(input_file),
+            '-t', str(t_file),
+            '-n', str(cpus_tot)
+        ])
+
         call_str = (
             'echo ""\n'
             f'echo "executing: {mpirun_command}"\n'
             'echo ""\n'
             f'time {mpirun_command}\n'
         )
+
+        if spice_version == 3:
+            # Append a call to stitcher if using Spice-3
+            call_str += (
+                'echo ""\n'
+                f'echo "executing: {stitcher_command}"\n'
+                'echo ""\n'
+                f'time {stitcher_command}\n'
+            )
 
         postcall_str = (
             f'\n\nsleep 600 \n'
