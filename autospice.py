@@ -217,6 +217,8 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
                 if not dryrun_fl:
                     shutil.copy(input_file, output_dir)
                     shutil.copy(config_file, output_dir)
+
+                call_params['output_dir'] = output_dir
             else:
                 # If there are parameters to scan then run output directory IO in each parameter-specific folder.
                 if j == 0:
