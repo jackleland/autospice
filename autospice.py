@@ -7,8 +7,8 @@ import subprocess
 import os
 import shutil
 import math
-import autospice.machine as mch
-from autospice.logger import Logger
+import machine as mch
+from logger import Logger
 
 from humanfriendly import format_timespan
 import click
@@ -16,7 +16,7 @@ import click
 
 SUPPORTED_CODES = {}
 try:
-    from autospice.codes.spice import Spice
+    from codes.spice import Spice
     SUPPORTED_CODES['spice'] = Spice()
 except ImportError:
     print("Couldn't import SPICE module, you may need to install flopter.")

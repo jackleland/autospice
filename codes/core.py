@@ -2,7 +2,7 @@ import abc
 import shutil
 import datetime
 from pathlib import Path
-from autospice.utils import find_next_available_dir
+from utils import find_next_available_dir
 
 
 class SimulationCode(abc.ABC):

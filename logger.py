@@ -1,7 +1,7 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import datetime
-from autospice.utils import find_next_available_filename
+from utils import find_next_available_filename
 from warnings import warn
 import pathlib as p
 import pickle

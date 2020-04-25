@@ -1,9 +1,9 @@
 import pprint as pp
 from collections import OrderedDict
-from autospice.codes.core import SimulationCode
+from codes.core import SimulationCode
 from flopter.spice import utils as sput
 from flopter.spice.inputparser import InputParser
-from autospice.utils import find_next_available_dir
+from utils import find_next_available_dir
 
 
 class Spice(SimulationCode):
