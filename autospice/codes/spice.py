@@ -1,141 +1,9 @@
-import abc
-import shutil
-import datetime
-from pathlib import Path
 import pprint as pp
 from collections import OrderedDict
+from autospice.codes.core import SimulationCode
+from flopter.spice import utils as sput
 from flopter.spice.inputparser import InputParser
-import flopter.spice.utils as sput
-from utils import find_next_available_dir
-
-LOG_PREFIX = 'log'
-
-
-class SimulationCode(abc.ABC):
-    """
-    Abstract base class for storing code specific options and any necessary
-    verification methods
-    """
-    SUBCLASS_COUNT = 0
-
-    def __init__(self, name, mandatory_config_labels, optional_config_labels=None, boolean_config_labels=None):
-        self.name = name
-        self.mandatory_config_labels = mandatory_config_labels
-
-        if optional_config_labels is not None:
-            self.optional_config_labels = set(optional_config_labels)
-        else:
-            self.optional_config_labels = set()
-
-        self.all_config_labels = set(self.mandatory_config_labels) | self.optional_config_labels
-
-        if boolean_config_labels and self.all_config_labels.issuperset(set(boolean_config_labels)):
-            self.boolean_labels = boolean_config_labels
-        else:
-            self.boolean_labels = set()
-        SimulationCode.increment_counter()
-
-    def process_config_options(self, config_opts):
-        all_config_labels = set(self.mandatory_config_labels) | self.optional_config_labels
-
-        # Verify that all mandatory options are present
-        if not set(self.mandatory_config_labels).issubset(config_opts.keys()):
-            raise ValueError('The options in the config file do not match those specified in the code\'s definition. \n'
-                             f'The config file should contain all mandatory options ({self.mandatory_config_labels}) '
-                             f'under the heading "{self.name}". \nMissing params: '
-                             f'{set(self.mandatory_config_labels) - set(config_opts)}')
-
-        # Verify that no undefined options were added in
-        for label in config_opts:
-            if label not in all_config_labels:
-                raise ValueError(f'An interloper option ({label}) was found in the config file. \n'
-                                 f'The config file should contain only these options: '
-                                 f'{all_config_labels} under the heading "{self.name}"')
-
-        # Set strings to bools if appropriate
-        if self.boolean_labels:
-            for boolean_label in self.boolean_labels:
-                try:
-                    config_opts.getboolean(boolean_label)
-                except ValueError:
-                    raise ValueError(f'The boolean flag "{boolean_label}" is not set to a valid boolean value. \n'
-                                     f'The current value is {config_opts[boolean_label]}.')
-        return config_opts
-
-    def copy_on_restart(self, output_dir, dryrun_fl, mode):
-        # If restarting, copy files depending on the copy mode passed.
-        if mode in ['0', 'none']:
-            # Make no backup, run in the original directory
-            print(f"You've opted not to backup the restart directory")
-            return output_dir
-        elif mode in ['1', 'new']:
-            # Make a backup of the original directory and run from the backup
-            restart_dir = find_next_available_dir(Path(f"{output_dir}_restart"))
-            print(f"Restarting {self.name} run in directory {restart_dir}, leaving a backup of start files in "
-                  f"{output_dir} \n")
-
-            if not dryrun_fl:
-                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
-            return restart_dir
-        elif mode in ['2', 'stay_out']:
-            # Make a backup of the original directory and run from the original directory
-            restart_dir = find_next_available_dir(Path(f"{output_dir}_at_restart"))
-            print(f"Restarting {self.name} run in directory {output_dir}, making a backup of start files in "
-                  f"{restart_dir} \n")
-
-            if not dryrun_fl:
-                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
-            return output_dir
-        elif mode in ['3', 'stay_in']:
-            # Make a backup of the original directory inside the original directory and run from original directory
-            datetime_str = datetime.datetime.today().strftime('%Y%m%d-%H%M')
-            restart_dir = find_next_available_dir(output_dir / f'backup_at_restart_{datetime_str}')
-            print(f"Restarting {self.name} run in directory {output_dir}, making a backup of start files in "
-                  f"{restart_dir} \n")
-
-            if not dryrun_fl:
-                shutil.copytree(output_dir, restart_dir, ignore=shutil.ignore_patterns('*backup*'))
-            return output_dir
-        else:
-            raise ValueError('Invalid restart copy mode selected, see documentation for proper usage.')
-
-    @abc.abstractmethod
-    def print_config_options(self, config_opts):
-        pass
-
-    @abc.abstractmethod
-    def get_command_line_args(self, config_opts):
-        pass
-
-    @abc.abstractmethod
-    def get_submission_script_body(self, machine, call_params, multi_submission=False):
-        pass
-
-    @abc.abstractmethod
-    def verify_input_file(self, input_file):
-        pass
-
-    @abc.abstractmethod
-    def is_parameter_scan(self, input_file):
-        pass
-
-    @classmethod
-    @abc.abstractmethod
-    def is_restart(cls, config_opts):
-        pass
-
-    @staticmethod
-    @abc.abstractmethod
-    def is_code_output_dir(directory):
-        pass
-
-    @abc.abstractmethod
-    def directory_io(self, output_dir, config_opts, dryrun_fl, restart_copy_mode=1, print_fl=True):
-        pass
-
-    @classmethod
-    def increment_counter(cls):
-        cls.SUBCLASS_COUNT += 1
+from autospice.utils import find_next_available_dir
 
 
 class Spice(SimulationCode):
@@ -191,8 +59,11 @@ class Spice(SimulationCode):
             except ValueError:
                 raise ValueError('The "time_limit" optional code config option must be a positive, integer number '
                                  'of hours.')
-            print(f'WARNING: You have specified a hard time limit on spice of {time_limit}hrs. This will override the '
-                  f'time set by --safe_job_time_fl.')
+            print(
+                f'WARNING: You have specified a hard time limit on spice of {time_limit}hrs. This will override the \n'
+                f'time set by --safe_job_time_fl.'
+            )
+
         return config_opts
 
     def print_config_options(self, config_opts):
@@ -274,28 +145,39 @@ class Spice(SimulationCode):
         if 'time_limit' not in config_opts and machine.max_job_time is not None and safe_job_time_fl:
             config_file_args.append(f'-l {machine.get_safe_job_time()}')
 
-        mpirun_command = ' '.join(['mpirun', '-np', str(cpus_tot), str(executable_dir / executable),
-                                   *config_file_args,
-                                   '-o', str(o_file),
-                                   '-i', str(input_file),
-                                   '-t', str(t_file)
-                                   ])
-
-        stitcher_command = ' '.join([
-            str(executable_dir / 'stitcher.bin'),
+        # TODO: This could be passed here from a scheduler method, would make it a bit more modular.
+        if 'node_dist_string' in call_params:
+            # Make the run command use srun's arbitrary mode to distribute tasks to nodes non-equally
+            run_command = ' '.join([
+                'srun', '-n', str(cpus_tot),
+                '-m', 'arbitrary',
+                f'-w', '`{executable_dir / "arbitrary.pl"} {call_params["node_dist_string"]}`',
+            ])
+        else:
+            run_command = ' '.join(['mpirun', '-np', str(cpus_tot)])
+        spice_command = ' '.join([
+            str(executable_dir / executable),
+            *config_file_args,
+            '-o', str(o_file),
             '-i', str(input_file),
-            '-t', str(t_file),
-            '-n', str(cpus_tot)
+            '-t', str(t_file)
         ])
 
         call_str = (
             'echo ""\n'
-            f'echo "executing: {mpirun_command}"\n'
+            f'echo "executing: {run_command} {spice_command}"\n'
             'echo ""\n'
-            f'time {mpirun_command}\n'
+            f'time {run_command} {spice_command}\n'
         )
 
         if spice_version == 3:
+            stitcher_command = ' '.join([
+                str(executable_dir / 'stitcher.bin'),
+                '-i', str(input_file),
+                '-t', str(t_file),
+                '-n', str(cpus_tot)
+            ])
+
             # Append a call to stitcher if using Spice-3
             call_str += (
                 'echo ""\n'
@@ -306,8 +188,8 @@ class Spice(SimulationCode):
 
         postcall_str = (
             f'\n\nsleep 600 \n'
-            f'cat {output_dir / LOG_PREFIX}.out >> {output_dir / LOG_PREFIX}.ongoing.out\n'
-            f'cat {output_dir / LOG_PREFIX}.err >> {output_dir / LOG_PREFIX}.ongoing.err\n\n'
+            f'cat {output_dir / self.LOG_PREFIX}.out >> {output_dir / self.LOG_PREFIX}.ongoing.out\n'
+            f'cat {output_dir / self.LOG_PREFIX}.err >> {output_dir / self.LOG_PREFIX}.ongoing.err\n\n'
 
             f'BU_FOLDER="{output_dir}/backup_$(env TZ=GB date +"%Y%m%d-%H%M")"\n'
             'echo "Making backup of simulation data into $BU_FOLDER"\n'
@@ -350,15 +232,50 @@ class Spice(SimulationCode):
     def is_restart(cls, config_opts):
         return cls.get_restart_mode(config_opts, rm_format='bool')
 
-    def verify_input_file(self, input_file):
-        # TODO: Implement this!
-        pass
+    def verify_input_file(self, input_file, call_params, print_fl=True):
+        input_parser = InputParser(input_filename=input_file)
+
+        if print_fl:
+            print('Verifying input file...')
+
+        # TODO: might be more sensible to have this in input parser?
+        if self.version == 3:
+            geometry = input_parser['geom']
+            for size_dim in ['Lx, Ly, Lz']:
+                # Check simulation window dimensions are all powers of 2
+                size = int(geometry[size_dim])
+                if (size & (size - 1) != 0) or size == 0:
+                    raise ValueError(
+                        f'Invlaid simulation window size given ({size_dim}={size})\n '
+                        f'Must be a power of 2 in 3D simulations.'
+                    )
+
+            # Check the decomposition is valid
+            decomp_total = int(geometry['decompose_x']) * int(geometry['decompose_y'])
+            if (decomp_total & (decomp_total - 1) != 0) or decomp_total == 0:
+                raise ValueError(
+                    f'Invalid x-y decomposition given (no. of decomposition areas = {decomp_total})\n '
+                    f'Must be a power of 2 in 3D simulations.'
+                )
+            if decomp_total != call_params['cpus_tot']:
+                raise ValueError(
+                    f'Invalid x-y decomposition given (no. of decomposition areas = {decomp_total})\n '
+                    f'Must equal the number of cpus requested ({call_params["cpus_tot"]}).'
+                )
+
+            # Check species properly set
+            no_species = int(input_parser['num_spec']['no_species'])
+            for i in range(no_species):
+                species_sect = input_parser[f'specie{i}']
+                if int(species_sect['mpi_rank']) != -1:
+                    raise ValueError(f'Invalid mpi_rank on species {species_sect["name"]}, must be set to -1')
+        # TODO: Could also check that the no_{section} values all equal the number of those sections
 
     def is_parameter_scan(self, input_file):
         input_parser = InputParser(input_filename=input_file, read_comments_fl=False)
         scan_params = input_parser.get_scanning_params()
         if len(scan_params) > 1:
-            raise ValueError('Attempting multi-dimensional parameter scan, not currently supported')
+            raise NotImplementedError('Attempting multi-dimensional parameter scan, not currently supported')
         return len(scan_params) == 1
 
     @staticmethod
@@ -382,7 +299,7 @@ class Spice(SimulationCode):
         scan_params = input_parser.get_scanning_params()
         # TODO: (2019-07-15) Implement multi-dimensional scans
         if len(scan_params) > 1:
-            raise ValueError('Requested multi-dimensional parameter scan, not currently supported')
+            raise NotImplementedError('Requested multi-dimensional parameter scan, not currently supported')
         return scan_params, input_parser
 
     @staticmethod

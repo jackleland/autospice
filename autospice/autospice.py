@@ -4,25 +4,27 @@ from collections import OrderedDict
 from pprint import pprint
 from datetime import timedelta
 import subprocess
-import machine as mch
-import codes
+from autospice import machine as mch
 import os
 import shutil
 import math
-from logger import Logger
+from autospice.logger import Logger
 
 from humanfriendly import format_timespan
 import click
+
+
+SUPPORTED_CODES = {}
+try:
+    from autospice.codes import Spice
+    SUPPORTED_CODES['spice'] = Spice()
+except ImportError:
+    print("Couldn't import SPICE module, you may need to install flopter.")
 
 SUPPORTED_MACHINES = {
     'marconi': mch.marconi_skl,
     'marconi_long': mch.marconi_skl_fuaspecial,
     'cumulus': mch.cumulus
-}
-# TODO: Auto-populate this with ast
-# TODO: Make default code with generic options?
-SUPPORTED_CODES = {
-    'spice': codes.Spice()
 }
 
 
@@ -160,7 +162,7 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
     if not input_file.is_file():
         raise FileNotFoundError(f"No input file found at {input_file}")
 
-    sim_code.verify_input_file(input_file)
+    sim_code.verify_input_file(input_file, call_params)
     param_scan_fl = sim_code.is_parameter_scan(input_file)
 
     # Check executable file exists
@@ -193,8 +195,8 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
         'config_opts': code_specific_opts
     })
     submission_params.update({
-        'out_log': output_dir / f'{codes.LOG_PREFIX}.out',
-        'err_log': output_dir / f'{codes.LOG_PREFIX}.err',
+        'out_log': output_dir / f'{sim_code.LOG_PREFIX}.out',
+        'err_log': output_dir / f'{sim_code.LOG_PREFIX}.err',
     })
 
     print_choices(submission_params, call_params, code_name, machine_name)
@@ -243,8 +245,8 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
                         inp_parser.write(f)
 
                 submission_params['job_name'] = f'{job_name_base}_{param_value}'
-                submission_params['out_log'] = output_dir / f'{codes.LOG_PREFIX}.out'
-                submission_params['err_log'] = output_dir / f'{codes.LOG_PREFIX}.err'
+                submission_params['out_log'] = output_dir / f'{sim_code.LOG_PREFIX}.out'
+                submission_params['err_log'] = output_dir / f'{sim_code.LOG_PREFIX}.err'
 
                 call_params['output_dir'] = output_dir
                 call_params['input_file'] = input_file
@@ -375,6 +377,7 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
             memory_req = machine.memory_per_node * nodes
         optional_submission_params['memory'] = memory_req
 
+    # Parameters needed for batch submission
     submission_params = {
         'job_name': job_name,
         'nodes': nodes,
@@ -386,9 +389,24 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
     if 'email' in submission_params and 'email_events' not in submission_params:
         submission_params['email_events'] = machine.scheduler.default_email_settings
 
+    # Parameters needed for writing the script that calls the simulation code
     call_params = {
         'cpus_tot': n_cpus,
     }
+
+    isolate_first_node = False
+    if 'isolate_first_node' in scheduler_opts:
+        isolate_first_node_fl = scheduler_opts.getboolean('isolate_first_node')
+        if isolate_first_node_fl:
+            if machine.scheduler != 'slurm':
+                raise NotImplementedError('First node isolation has only been implemented for slurm at this time.')
+            min_cpus, max_cpus = machine.get_isolated_node_distribution(n_cpus, nodes)
+            print(
+                f'WARNING: You have set the isolate_first_node option, this will put the first mpi-task on a \n'
+                f'separate node to better utilise memory. The same number of nodes requested will be used, but \n'
+                f'the tasks-per-node option will be overridden.'
+            )
+            call_params['node_dist_string'] = f'1,{",".join([str(min_cpus) for _ in range(nodes - 2)])},{max_cpus}'
 
     ignored_params = set(scheduler_opts.keys()) - set(submission_params.keys()) - {'n_cpus', 'machine', 'user'}
     if len(ignored_params) > 0:
@@ -419,6 +437,8 @@ def print_choices(submission_params, call_params, code_name, machine_name):
         options.update({'Queue': submission_params['queue']})
     if 'account' in submission_params:
         options.update({'Account': submission_params['account']})
+    if 'node_dist_string' in call_params:
+        options.update({'Node-task distribution': call_params['node_dist_string']})
 
     pprint(options)
     print(f"\nWill use {call_params['cpus_tot']} cpus across {submission_params['nodes']} nodes")

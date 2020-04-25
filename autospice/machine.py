@@ -1,5 +1,5 @@
 from warnings import warn
-import scheduler as sch
+from autospice import scheduler as sch
 import math
 import collections
 
@@ -112,6 +112,15 @@ class Machine(object):
             print('WARNING: Using maximum acceptable number of nodes on this machine. If you have any currently \n'
                   'running jobs this job will not be run until they have finished. \n')
         return cpus_per_node
+
+    def get_isolated_node_distribution(self, cpus, nodes):
+        minimum_cpus = (cpus - 1) // (nodes - 1)
+        maximum_cpus = minimum_cpus + ((cpus - 1) % (nodes - 1))
+        if minimum_cpus > self.max_cpus_per_node or maximum_cpus > self.max_cpus_per_node:
+            raise ValueError(f'Number of processors required to isolate the first node does not fit onto {nodes} '
+                             f'node(s) on {self.name}\n'
+                             f'You will need to increase the number of nodes requested. \n')
+        return minimum_cpus, maximum_cpus
 
 
 marconi_skl = Machine('Marconi', 48, 177, 64, 24, "slurm")
