@@ -1,5 +1,5 @@
 from warnings import warn
-from autospice import scheduler as sch
+import autospice.scheduler as sch
 import math
 import collections
 

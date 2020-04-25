@@ -4,10 +4,10 @@ from collections import OrderedDict
 from pprint import pprint
 from datetime import timedelta
 import subprocess
-from autospice import machine as mch
 import os
 import shutil
 import math
+import autospice.machine as mch
 from autospice.logger import Logger
 
 from humanfriendly import format_timespan
@@ -16,7 +16,7 @@ import click
 
 SUPPORTED_CODES = {}
 try:
-    from autospice.codes import Spice
+    from autospice.codes.spice import Spice
     SUPPORTED_CODES['spice'] = Spice()
 except ImportError:
     print("Couldn't import SPICE module, you may need to install flopter.")
