@@ -398,7 +398,7 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
     if 'isolate_first_node' in scheduler_opts:
         isolate_first_node_fl = scheduler_opts.getboolean('isolate_first_node')
         if isolate_first_node_fl:
-            if machine.scheduler != 'slurm':
+            if machine.scheduler.name.lower() != 'slurm':
                 raise NotImplementedError('First node isolation has only been implemented for slurm at this time.')
             min_cpus, max_cpus = machine.get_isolated_node_distribution(n_cpus, nodes)
             print(
