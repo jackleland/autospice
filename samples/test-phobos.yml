@@ -9,6 +9,7 @@
   n_cpus:     96
   nodes:      3
   memory:     512
+  isolate_first_node:   True
 
 [code]
   bin:            /home/jleland/spice/spice2/bin
