@@ -92,10 +92,10 @@ class Machine(object):
         cpus_per_node = self.check_nodes(cpus, nodes)
         return nodes, cpus_per_node
 
-    def check_nodes(self, cpus, nodes):
+    def check_nodes(self, cpus, nodes, allow_remainder_fl=False):
         cpus_per_node = cpus // nodes
         cpus_per_node_remainder = cpus % nodes
-        if cpus_per_node_remainder > 0:
+        if cpus_per_node_remainder > 0 and allow_remainder_fl is False:
             raise ValueError(f'Number of processors chosen does not divide equally between the nodes on {self.name}. \n'
                              'There must be an equal number of processors used on each node. \n')
         if cpus_per_node > self.max_cpus_per_node:

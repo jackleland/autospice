@@ -271,6 +271,9 @@ class Spice(SimulationCode):
                     raise ValueError(f'Invalid mpi_rank on species {species_sect["name"]}, must be set to -1')
         # TODO: Could also check that the no_{section} values all equal the number of those sections
 
+        if print_fl:
+            print('...Input file verified successfully!\n')
+
     def is_parameter_scan(self, input_file):
         input_parser = InputParser(input_filename=input_file, read_comments_fl=False)
         scan_params = input_parser.get_scanning_params()

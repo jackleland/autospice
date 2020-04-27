@@ -139,10 +139,11 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
     sim_code = SUPPORTED_CODES[code_name]
     machine = SUPPORTED_MACHINES[machine_name]
 
-    # cpus_per_node, cpus_tot, email, job_name, memory_req, n_jobs, nodes, walltime = process_scheduler_opts(
-    #     machine, scheduler_opts)
-    submission_params, call_params, n_jobs = process_scheduler_opts(machine, scheduler_opts,
-                                                                    safe_job_time_fl=safe_job_time_fl)
+    # Process the config file
+    submission_params, call_params, n_jobs = process_scheduler_options(machine, scheduler_opts,
+                                                                       safe_job_time_fl=safe_job_time_fl)
+    code_specific_opts = sim_code.process_config_options(config[code_name])
+
 
     # ---------------- Check Code Options ----------------
 
@@ -182,7 +183,6 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
         scan_param = {'values': [None]}
         inp_parser = None
 
-    code_specific_opts = sim_code.process_config_options(config[code_name])
     restart_fl = sim_code.is_restart(code_specific_opts)
     sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl=True, restart_copy_mode=restart_copy_mode,
                           print_fl=True)
@@ -306,7 +306,7 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
             shutil.rmtree(output_dir)
 
 
-def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
+def process_scheduler_options(machine, scheduler_opts, safe_job_time_fl=True):
     """
     Function for parsing teh config file and verifying the scheduler options for
     passing to the submission script writer.
@@ -316,18 +316,20 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
     to be calculated from information machine-relevant information, whereas some
     can simply be read.
 
-    :param machine:         Machine object created in main autospice script
-    :param scheduler_opts:  (section/dict) The section titled 'scheduler' from
-                            the configparser containing necessary information
-                            for an equivalent dictionary.
+    :param machine:             Machine object containing information about the
+                                supercomputer being submitted to and the
+                                scheduler it uses.
+    :param scheduler_opts:      (section/dict) The section titled 'scheduler'
+                                from the yaml config file, usually a Section
+                                from configparser.
     :param safe_job_time_fl:    (boolean) Controls whether a 'safe' time is used
                                 for walltime (90% of maximum allowed on machine)
                                 to allow time for I/O to occur before job is
                                 killed
-    :return:                (dict) Submission parameters, in a dictionary
-    :return:                (dict) Call parameters, in a dictionary
-    :return:                (int) Number of jobs required to be run due to
-                            walltime limitations on the machine
+    :return:                    (dict) Submission parameters, in a dictionary
+    :return:                    (dict) Call parameters, in a dictionary
+    :return:                    (int) Number of jobs required to be submitted
+                                due to wall-time limitations on the machine
 
     """
     job_name = scheduler_opts['job_name']
@@ -339,6 +341,7 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
     except:
         raise TypeError("Can't use a non-integer number of CPUs")
 
+    isolate_first_node_fl = 'isolate_first_node' in scheduler_opts and scheduler_opts.getboolean('isolate_first_node')
     if 'nodes' not in scheduler_opts:
         nodes, cpus_per_node = machine.calc_nodes(n_cpus)
     else:
@@ -346,7 +349,7 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
             nodes = int(scheduler_opts['nodes'])
         except:
             raise TypeError("Can't use a non-integer number of CPUs")
-        cpus_per_node = machine.check_nodes(n_cpus, nodes)
+        cpus_per_node = machine.check_nodes(n_cpus, nodes, allow_remainder_fl=isolate_first_node_fl)
 
     # TODO: verify string is in correct format
     walltime = scheduler_opts['walltime']
@@ -394,21 +397,19 @@ def process_scheduler_opts(machine, scheduler_opts, safe_job_time_fl=True):
         'cpus_tot': n_cpus,
     }
 
-    isolate_first_node = False
-    if 'isolate_first_node' in scheduler_opts:
-        isolate_first_node_fl = scheduler_opts.getboolean('isolate_first_node')
-        if isolate_first_node_fl:
-            if machine.scheduler.name.lower() != 'slurm':
-                raise NotImplementedError('First node isolation has only been implemented for slurm at this time.')
-            min_cpus, max_cpus = machine.get_isolated_node_distribution(n_cpus, nodes)
-            print(
-                f'WARNING: You have set the isolate_first_node option, this will put the first mpi-task on a \n'
-                f'separate node to better utilise memory. The same number of nodes requested will be used, but \n'
-                f'the tasks-per-node option will be overridden.'
-            )
-            call_params['node_dist_string'] = f'1,{",".join([str(min_cpus) for _ in range(nodes - 2)])},{max_cpus}'
+    if isolate_first_node_fl:
+        if machine.scheduler.name.lower() != 'slurm':
+            raise NotImplementedError('First node isolation has only been implemented for slurm at this time.')
+        min_cpus, max_cpus = machine.get_isolated_node_distribution(n_cpus, nodes)
+        print(
+            f'You have requested the isolate_first_node option, this will put the first mpi-task on a separate node \n'
+            f'to better utilise memory. The number of nodes requested will still be used, but the tasks-per-node \n'
+            f'option will be overridden.'
+        )
+        call_params['node_dist_string'] = f'1,{",".join([str(min_cpus) for _ in range(nodes - 2)])},{max_cpus}'
 
-    ignored_params = set(scheduler_opts.keys()) - set(submission_params.keys()) - {'n_cpus', 'machine', 'user'}
+    ignored_params = (set(scheduler_opts.keys()) - set(submission_params.keys()) - {'n_cpus', 'machine', 'user', }
+                      - {'isolate_first_node'})
     if len(ignored_params) > 0:
         print(f'WARNING: The following parameters have not been implemented for the scheduler \n'
               f'({machine.scheduler.name}) on {machine.name}: \n'
