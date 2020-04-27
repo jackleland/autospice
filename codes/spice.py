@@ -151,7 +151,7 @@ class Spice(SimulationCode):
             run_command = ' '.join([
                 'srun', '-n', str(cpus_tot),
                 '-m', 'arbitrary',
-                f'-w', '`{executable_dir / "arbitrary.pl"} {call_params["node_dist_string"]}`',
+                '-w', f'`{executable_dir / "arbitrary.pl"} {call_params["node_dist_string"]}`',
             ])
         else:
             run_command = ' '.join(['mpirun', '-np', str(cpus_tot)])

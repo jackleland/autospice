@@ -144,7 +144,6 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
                                                                        safe_job_time_fl=safe_job_time_fl)
     code_specific_opts = sim_code.process_config_options(config[code_name])
 
-
     # ---------------- Check Code Options ----------------
 
     executable_dir = Path(code_opts['bin'])
