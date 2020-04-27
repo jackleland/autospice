@@ -167,7 +167,7 @@ class Spice(SimulationCode):
             'echo ""\n'
             f'echo "executing: {run_command} {spice_command}"\n'
             'echo ""\n'
-            f'time {run_command} {spice_command}\n'
+            f'time {run_command} {spice_command}\n\n'
         )
 
         if spice_version == 3:
@@ -183,7 +183,7 @@ class Spice(SimulationCode):
                 'echo ""\n'
                 f'echo "executing: {stitcher_command}"\n'
                 'echo ""\n'
-                f'time {stitcher_command}\n'
+                f'{stitcher_command}\n\n'
             )
 
         postcall_str = (
@@ -246,7 +246,7 @@ class Spice(SimulationCode):
                 size = int(geometry[size_dim])
                 if (size & (size - 1) != 0) or size == 0:
                     raise ValueError(
-                        f'Invlaid simulation window size given ({size_dim}={size})\n '
+                        f'Invlaid simulation window size given ({size_dim}={size})\n'
                         f'Must be a power of 2 in 3D simulations.'
                     )
 
@@ -254,12 +254,12 @@ class Spice(SimulationCode):
             decomp_total = int(geometry['decompose_x']) * int(geometry['decompose_y'])
             if (decomp_total & (decomp_total - 1) != 0) or decomp_total == 0:
                 raise ValueError(
-                    f'Invalid x-y decomposition given (no. of decomposition areas = {decomp_total})\n '
+                    f'Invalid x-y decomposition given (no. of decomposition areas = {decomp_total})\n'
                     f'Must be a power of 2 in 3D simulations.'
                 )
             if decomp_total != call_params['cpus_tot']:
                 raise ValueError(
-                    f'Invalid x-y decomposition given (no. of decomposition areas = {decomp_total})\n '
+                    f'Invalid x-y decomposition given (no. of decomposition areas = {decomp_total})\n'
                     f'Must equal the number of cpus requested ({call_params["cpus_tot"]}).'
                 )
 
