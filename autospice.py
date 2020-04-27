@@ -234,8 +234,8 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
                 param_dir = f"{scan_param['parameter']}_{param_value}"
                 output_dir = output_dir_base / param_dir
 
-                if restart_fl:
-                    sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl=True, print_fl=True,
+                if not restart_fl:
+                    sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl=dryrun_fl, print_fl=False,
                                           restart_copy_mode=restart_copy_mode)
 
                 input_file = output_dir / 'input.inp'
