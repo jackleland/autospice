@@ -241,7 +241,7 @@ class Spice(SimulationCode):
         # TODO: might be more sensible to have this in input parser?
         if self.version == 3:
             geometry = input_parser['geom']
-            for size_dim in ['Lx, Ly, Lz']:
+            for size_dim in ['Lx', 'Ly', 'Lz']:
                 # Check simulation window dimensions are all powers of 2
                 size = int(geometry[size_dim])
                 if (size & (size - 1) != 0) or size == 0:
