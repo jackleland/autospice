@@ -195,6 +195,7 @@ class Spice(SimulationCode):
             'echo "Making backup of simulation data into $BU_FOLDER"\n'
             'mkdir "$BU_FOLDER"\n'
             f"rsync -azvp --exclude='backup*' {t_file}.mat $BU_FOLDER\n"
+            f"rsync -azvp --exclude='backup*' --exclude='*.mat' --exclude='*ongoing*' * $BU_FOLDER\n"
         )
         if backup_fl:
             postcall_str += f"rsync -azvp --exclude='backup*' {output_dir}/* $BU_FOLDER\n"

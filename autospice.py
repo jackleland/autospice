@@ -19,6 +19,7 @@ try:
     from codes.spice import Spice
     SUPPORTED_CODES['spice'] = Spice()
 except ImportError:
+    Spice = None
     print("Couldn't import SPICE module, you may need to install flopter.")
 
 SUPPORTED_MACHINES = {
