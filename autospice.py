@@ -32,11 +32,13 @@ SUPPORTED_MACHINES = {
 @click.command()
 @click.argument('config_file', type=click.Path(exists=True))
 @click.option('--dryrun_fl', '-d', default=False, is_flag=True)
+@click.option('--semi_dryrun_fl', '-D', default=False, is_flag=True)
 @click.option('--safe_job_time_fl', '-s', default=True, is_flag=True)
 @click.option('--backup_fl', '-b', default=True, is_flag=True)
 @click.option('--restart_copy_mode', '-r', default='1', type=click.Choice(['0', '1', '2', '3', 'none', 'new', 'stay_in',
                                                                            'stay_out']))
-def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=True, restart_copy_mode='1'):
+def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time_fl=True, backup_fl=True,
+                                                                                                    restart_copy_mode='1'):
     """
     Reads a YAML-like configuration file, writes a job script, and submits a
     simulation job based on the options contained in the file.
@@ -75,6 +77,12 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
     dryrun_fl : bool
         Boolean flag denoting whether a dry run is being performed or not. If
         performing a dry run no file i/o or submissions will take place.
+
+    semi_dryrun_fl : bool
+        Boolean flag denoting whether a semi-dry run is being performed. If
+        true, all i/o operations are carried out but no batch submission is made
+        and the executable check is skipped. This is superceded by dryrun_fl,
+        i.e. it will have no effect if dryrun_fl is also set to True.
 
     safe_job_time_fl : bool
         Boolean flag denoting whether a safe job time should be requested,
@@ -168,7 +176,7 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
 
     # Check executable file exists
     executable = Path(code_opts['executable'])
-    if not executable.is_file() and not dryrun_fl:
+    if not executable.is_file() and not dryrun_fl and not semi_dryrun_fl:
         raise FileNotFoundError(f"No executable file found at {executable}")
 
     if param_scan_fl:
@@ -262,6 +270,8 @@ def submit_job(config_file, dryrun_fl=False, safe_job_time_fl=True, backup_fl=Tr
             if dryrun_fl:
                 print(f"Job script written as: \n"
                       f"{job_script}\n")
+            elif semi_dryrun_fl:
+                print(f"Job script written to {output_dir}.")
             else:
                 out = subprocess.check_output([machine.scheduler.submission_command, str(job_script)])
                 *rest, job_num = str(out, 'utf-8').split(' ')
