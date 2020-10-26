@@ -14,7 +14,7 @@
 [code]
   bin:            /home/jleland/spice/spice2/bin
   input:          ./inputs/lowdens_anglescan/angled_tiltscan_restart1.inp
-  output:         ./data_offline_0/lowdens_anglescan/angled_tiltscan
+  output:         ./data_offline_1/lowdens_anglescan/angled_tiltscan
   executable:     spice-2.11-release.bin
   code_name:      spice
 
@@ -23,4 +23,4 @@
   time_limit:     1
   verbose:        True
   soft_restart:   False
-  full_restart:   True
+  full_restart:   False
