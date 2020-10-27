@@ -13,8 +13,8 @@
 
 [code]
   bin:            /home/jleland/spice/spice2/bin
-  input:          ./inputs/lowdens_anglescan/angled_tiltscan_restart1.inp
-  output:         ./data_offline_1/lowdens_anglescan/angled_tiltscan
+  input:          ./inputs/test/2d(d1d2)scan_angled_recessed.inp
+  output:         ./data_offline_1/scan_test/2d_scan_samelengths
   executable:     spice-2.11-release.bin
   code_name:      spice
 

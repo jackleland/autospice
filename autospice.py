@@ -4,6 +4,7 @@ from collections import OrderedDict
 from pprint import pprint
 from datetime import timedelta
 import subprocess
+import itertools
 import os
 import shutil
 import math
@@ -35,10 +36,11 @@ SUPPORTED_MACHINES = {
 @click.option('--semi_dryrun_fl', '-D', default=False, is_flag=True)
 @click.option('--safe_job_time_fl', '-s', default=True, is_flag=True)
 @click.option('--backup_fl', '-b', default=True, is_flag=True)
-@click.option('--restart_copy_mode', '-r', default='1', type=click.Choice(['0', '1', '2', '3', 'none', 'new', 'stay_in',
+@click.option('--restart_copy_mode', '-r', default='0', type=click.Choice(['0', '1', '2', '3', 'none', 'new', 'stay_in',
                                                                            'stay_out']))
+@click.option('--param_scan_dims', '-p', default=0, type=click.INT)
 def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time_fl=True, backup_fl=True,
-                                                                                                    restart_copy_mode='1'):
+               param_scan_dims=0, restart_copy_mode='1'):
     """
     Reads a YAML-like configuration file, writes a job script, and submits a
     simulation job based on the options contained in the file.
@@ -95,6 +97,13 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
         Boolean flag denoting whether simulation directory should be
         periodically backed up. This will usually be useful at the end of a
         simulation on a machine with a limited job time e.g. Marconi
+
+    param_scan_dims : int
+        The number of dimensions to run a parameter scan over. This is to
+        specify behaviour in the event that several parameter scans are included
+        and intended to be run as a single parameter scan. Default is 0, which
+        runs n-dimensionally i.e. treats each parameter list in the input file
+        as a separate dimension to scan over.
 
     restart_copy_mode: int / str
         Option to select the type of copying that happens on restart as a means
@@ -181,15 +190,49 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
 
     if param_scan_fl:
         # TODO: The use of an input parser is SPICE specific
-        scan_param, inp_parser = sim_code.get_scanning_parameters(input_file)
-        scan_param = scan_param[0]
-        print(f"Submitting a parameter scan, scanning over \'{scan_param['parameter']}\' with the following values: \n")
-        for value in scan_param['values']:
-            print(f'\t{value}')
+        scan_params, inp_parser = sim_code.get_scanning_parameters(input_file)
+        if param_scan_dims == 0:
+            param_scan_dims = len(scan_params)
+
+        # TODO: (2020-10-27) Different dimensionality is currently detected by parameter scan length. Any other method
+        #  of differentiation can't be handled automatically, so a new method of input will need to be implemented
+        #  (maybe another section in the yaml file) to do this properly. Another 'would be nice' feature is collecting
+        #  certain same-length parameter scans into a single dimension - which could similarly be done using more
+        #  specific user input.
+        lengths = set([sp['length'] for sp in scan_params])
+        if len(lengths) != param_scan_dims and len(scan_params) != param_scan_dims:
+            raise ValueError(
+                f'Cannot perform {param_scan_dims}d parameter scan; "param_scan_dims" should be set to the number of '
+                f'different parameter scans ({len(scan_params)}) or the number of different scan lengths '
+                f'({len(lengths)}). \n'
+                f'Mixed multi-dimensional scanning is not yet supported.')
+
+        if len(scan_params) == 1:
+            arranged_sp_vals = [tuple([value], ) for value in scan_params[0]['values']]
+        else:
+            all_sp_vals = [sp['values'] for sp in scan_params]
+            if param_scan_dims == 1:
+                arranged_sp_vals = zip(*all_sp_vals)
+            else:
+                arranged_sp_vals = itertools.product(*all_sp_vals)
+
+        arranged_sp_vals = list(arranged_sp_vals)
+        sp_names = [f"\'{sp['section']}.{sp['parameter']}\'({sp['length']})" for sp in scan_params]
+        formatted_names = ", ".join(sp_names)
+        n_scans = len(arranged_sp_vals)
+        digits = int(math.log10(n_scans)) + 1
+
+        print(f"Submitting a {param_scan_dims}d parameter scan! \n"
+              f"Scanning over parameter(s) {formatted_names} \n"
+              f"with the following values (N={n_scans}): \n")
+        for i, value in enumerate(arranged_sp_vals):
+            print(f'{str(i + 1).zfill(digits)}) \t{", ".join([v for v in value])}')
         print('\n')
     else:
-        scan_param = {'values': [None]}
+        arranged_sp_vals = [None]
+        scan_params = [None]
         inp_parser = None
+        sp_names = [None]
 
     restart_fl = sim_code.is_restart(code_specific_opts)
     sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl=True, restart_copy_mode=restart_copy_mode,
@@ -218,8 +261,8 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
 
     if click.confirm('\nDo you want to continue?', default=True):
         # Start parameter scan
-        for j, param_value in enumerate(scan_param['values']):
-            if param_value is None:
+        for j, param_values in enumerate(arranged_sp_vals):
+            if param_values is None:
                 # If there are no parameters to scan then do output directory IO (creation and, if restart, backup)
                 # in the requested directory
                 output_dir = sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl, print_fl=False,
@@ -239,7 +282,10 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
                         shutil.copy(input_file, output_dir_base)
                         shutil.copy(config_file, output_dir_base)
 
-                param_dir = f"{scan_param['parameter']}_{param_value}"
+                if param_scan_dims == 1:
+                    param_dir = f"{scan_params[0]['parameter']}_{param_values[0]}"
+                else:
+                    param_dir = '__'.join([f"{sp['parameter']}_{param_values[k]}" for k, sp in enumerate(scan_params)])
                 output_dir = output_dir_base / param_dir
 
                 if not restart_fl:
@@ -247,12 +293,16 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
                                           restart_copy_mode=restart_copy_mode)
 
                 input_file = output_dir / 'input.inp'
-                inp_parser[scan_param['section']][scan_param['parameter']] = param_value
+                for k, scan_param in enumerate(scan_params):
+                    inp_parser[scan_param['section']][scan_param['parameter']] = param_values[k]
                 if not dryrun_fl:
                     with open(input_file, 'w') as f:
                         inp_parser.write(f)
 
-                submission_params['job_name'] = f'{job_name_base}_{param_value}'
+                if param_scan_dims == 1:
+                    submission_params['job_name'] = f'{job_name_base}_{param_values[0]}'
+                else:
+                    submission_params['job_name'] = f'{job_name_base}_{param_dir}'
                 submission_params['out_log'] = output_dir / f'{sim_code.LOG_PREFIX}.out'
                 submission_params['err_log'] = output_dir / f'{sim_code.LOG_PREFIX}.err'
 

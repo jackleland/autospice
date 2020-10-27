@@ -278,9 +278,7 @@ class Spice(SimulationCode):
     def is_parameter_scan(self, input_file):
         input_parser = InputParser(input_filename=input_file, read_comments_fl=False)
         scan_params = input_parser.get_scanning_params()
-        if len(scan_params) > 1:
-            raise NotImplementedError('Attempting multi-dimensional parameter scan, not currently supported')
-        return len(scan_params) == 1
+        return len(scan_params) >= 1
 
     @staticmethod
     def get_scanning_parameters(input_file):
@@ -301,9 +299,6 @@ class Spice(SimulationCode):
         """
         input_parser = InputParser(input_filename=input_file)
         scan_params = input_parser.get_scanning_params()
-        # TODO: (2019-07-15) Implement multi-dimensional scans
-        if len(scan_params) > 1:
-            raise NotImplementedError('Requested multi-dimensional parameter scan, not currently supported')
         return scan_params, input_parser
 
     @staticmethod
