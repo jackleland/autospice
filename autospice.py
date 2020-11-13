@@ -40,7 +40,7 @@ SUPPORTED_MACHINES = {
                                                                            'stay_out']))
 @click.option('--param_scan_dims', '-p', default=0, type=click.INT)
 def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time_fl=True, backup_fl=True,
-               param_scan_dims=0, restart_copy_mode='1'):
+               param_scan_dims=0, restart_copy_mode='0'):
     """
     Reads a YAML-like configuration file, writes a job script, and submits a
     simulation job based on the options contained in the file.

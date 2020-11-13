@@ -103,7 +103,8 @@ class SimulationCode(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def get_submission_script_body(self, machine, call_params, multi_submission=False):
+    def get_submission_script_body(self, machine, call_params, multi_submission=False, safe_job_time_fl=False,
+                                   backup_fl=False):
         pass
 
     @abc.abstractmethod
