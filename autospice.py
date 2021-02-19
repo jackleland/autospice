@@ -34,13 +34,14 @@ SUPPORTED_MACHINES = {
 @click.argument('config_file', type=click.Path(exists=True))
 @click.option('--dryrun_fl', '-d', default=False, is_flag=True)
 @click.option('--semi_dryrun_fl', '-D', default=False, is_flag=True)
+@click.option('--log_fl', '-l', default=False, is_flag=True)
 @click.option('--safe_job_time_fl', '-s', default=True, is_flag=True)
 @click.option('--backup_fl', '-b', default=True, is_flag=True)
 @click.option('--restart_copy_mode', '-r', default='0', type=click.Choice(['0', '1', '2', '3', 'none', 'new', 'stay_in',
                                                                            'stay_out']))
 @click.option('--param_scan_dims', '-p', default=0, type=click.INT)
 def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time_fl=True, backup_fl=True,
-               param_scan_dims=0, restart_copy_mode='0'):
+               param_scan_dims=0, restart_copy_mode='0', log_fl=False):
     """
     Reads a YAML-like configuration file, writes a job script, and submits a
     simulation job based on the options contained in the file.
@@ -92,6 +93,10 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
         requested to allow the remaining 10% to be used for I/O etc. This
         hopefully stops the maximum allowed job time from interfering with the
         simulation.
+
+    log_fl : bool
+        Boolean flag denoting whether to log the submission to the configured
+        database.
 
     backup_fl : bool
         Boolean flag denoting whether simulation directory should be
@@ -209,14 +214,38 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
 
         if len(scan_params) == 1:
             arranged_sp_vals = [tuple([value], ) for value in scan_params[0]['values']]
+            arranged_sp_labels = [f"{scan_params[0]['parameter']}_{param_values[0]}"
+                                  for param_values in arranged_sp_vals]
         else:
             all_sp_vals = [sp['values'] for sp in scan_params]
             if param_scan_dims == 1:
-                arranged_sp_vals = zip(*all_sp_vals)
-            else:
-                arranged_sp_vals = itertools.product(*all_sp_vals)
+                arranged_sp_vals = list(zip(*all_sp_vals))
+                arranged_sp_labels = [f"{scan_params[0]['parameter']}_{param_values[0]}"
+                                      for param_values in arranged_sp_vals]
+            elif len(lengths) == param_scan_dims:
+                dim_indices = {length: j for j, length in enumerate(lengths)}
+                all_sp_lens = [sp['length'] for sp in scan_params]
+                all_sp_len_dims = [dim_indices[l] for l in all_sp_lens]
 
-        arranged_sp_vals = list(arranged_sp_vals)
+                dim_permutations = list(itertools.product(*[range(length) for length in lengths]))
+                arranged_sp_vals = [tuple(all_sp_vals[i][perm[d]] for i, d in enumerate(all_sp_len_dims)) for perm in
+                                    dim_permutations]
+
+                dim_index_map = [[] for _ in lengths]
+                for i, l in enumerate(all_sp_lens):
+                    dim_index_map[dim_indices[l]].append(i)
+                arranged_sp_labels = ['__'.join([f"{sp['parameter']}_{param_values[k]}"
+                                                 for k, sp in enumerate(scan_params)
+                                                 if k in [inds[0] for inds in dim_index_map]])
+                                      for param_values in arranged_sp_vals]
+            else:
+                arranged_sp_vals = list(itertools.product(*all_sp_vals))
+                arranged_sp_labels = ['__'.join([f"{sp['parameter']}_{param_values[k]}"
+                                                 for k, sp in enumerate(scan_params)])
+                                      for param_values in arranged_sp_vals]
+
+        assert len(arranged_sp_vals) == len(arranged_sp_labels)
+
         sp_names = [f"\'{sp['section']}.{sp['parameter']}\'({sp['length']})" for sp in scan_params]
         formatted_names = ", ".join(sp_names)
         n_scans = len(arranged_sp_vals)
@@ -225,14 +254,23 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
         print(f"Submitting a {param_scan_dims}d parameter scan! \n"
               f"Scanning over parameter(s) {formatted_names} \n"
               f"with the following values (N={n_scans}): \n")
-        for i, value in enumerate(arranged_sp_vals):
+        print_slc = slice(None, None)
+        if n_scans > 100:
+            print_slc = slice(0, 20)
+
+        for i, value in enumerate(arranged_sp_vals[print_slc]):
             print(f'{str(i + 1).zfill(digits)}) \t{", ".join([v for v in value])}')
+
+        if n_scans > 100:
+            print('\n\t· \n\t· \n\t· \n')
+            for i, value in enumerate(arranged_sp_vals[-5:]):
+                print(f'{str(n_scans - 4 + i).zfill(digits)}) \t{", ".join([v for v in value])}')
         print('\n')
     else:
         arranged_sp_vals = [None]
+        arranged_sp_labels = [None]
         scan_params = [None]
         inp_parser = None
-        sp_names = [None]
 
     restart_fl = sim_code.is_restart(code_specific_opts)
     sim_code.directory_io(output_dir, code_specific_opts, dryrun_fl=True, restart_copy_mode=restart_copy_mode,
@@ -282,10 +320,7 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
                         shutil.copy(input_file, output_dir_base)
                         shutil.copy(config_file, output_dir_base)
 
-                if param_scan_dims == 1:
-                    param_dir = f"{scan_params[0]['parameter']}_{param_values[0]}"
-                else:
-                    param_dir = '__'.join([f"{sp['parameter']}_{param_values[k]}" for k, sp in enumerate(scan_params)])
+                param_dir = arranged_sp_labels[j]
                 output_dir = output_dir_base / param_dir
 
                 if not restart_fl:
@@ -348,21 +383,22 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
                 # TODO: (2019-07-15) Expand to include n_jobs and param_scan_fl
                 # TODO: (2019-07-17) api_json_filename should be specified by a config file option, as should whether
                 #  the logger runs
-                logger = Logger(api_json_filename=str(autospice_dir / 'client_secret.json'))
-                logger.update_log({
-                    'machine': machine_name,
-                    'job_number': jobs[0],
-                    'job_name': submission_params['job_name'],
-                    'input_file': str(input_file),
-                    'masala_config': str(config_file),
-                    'nodes': submission_params['nodes'],
-                    'total_cores': call_params['cpus_tot'],
-                    'memory_req': submission_params['memory'] if 'memory' in submission_params else 'N/A',
-                    'wtime_req': submission_params['walltime'],
-                    'notes': ''
-                })
+                if log_fl:
+                    logger = Logger(api_json_filename=str(autospice_dir / 'client_secret.json'))
+                    logger.update_log({
+                        'machine': machine_name,
+                        'job_number': jobs[0],
+                        'job_name': submission_params['job_name'],
+                        'input_file': str(input_file),
+                        'masala_config': str(config_file),
+                        'nodes': submission_params['nodes'],
+                        'total_cores': call_params['cpus_tot'],
+                        'memory_req': submission_params['memory'] if 'memory' in submission_params else 'N/A',
+                        'wtime_req': submission_params['walltime'],
+                        'notes': ''
+                    })
     else:
-        if not dryrun_fl:
+        if not dryrun_fl and not restart_fl:
             shutil.rmtree(output_dir)
 
 
