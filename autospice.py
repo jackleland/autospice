@@ -193,6 +193,11 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
     if not executable.is_file() and not dryrun_fl and not semi_dryrun_fl:
         raise FileNotFoundError(f"No executable file found at {executable}")
 
+    copy_exe_fl = code_opts['copy_exe'] if 'copy_exe' in code_opts else False
+    if copy_exe_fl:
+        print(f'\nCopying executable {executable} and other executable files to output dir.\n'
+              f'Will be located in subfolder {sim_code.EXE_COPY_SUBFOLDER}.\n')
+
     if param_scan_fl:
         # TODO: The use of an input parser is SPICE specific
         scan_params, inp_parser = sim_code.get_scanning_parameters(input_file)
@@ -310,6 +315,8 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
                     shutil.copy(config_file, output_dir)
 
                 call_params['output_dir'] = output_dir
+                if copy_exe_fl:
+                    call_params = sim_code.copy_executable(output_dir, call_params, dryrun_fl)
             else:
                 # If there are parameters to scan then run output directory IO in each parameter-specific folder.
                 if j == 0:
@@ -343,6 +350,8 @@ def submit_job(config_file, dryrun_fl=False, semi_dryrun_fl=False, safe_job_time
 
                 call_params['output_dir'] = output_dir
                 call_params['input_file'] = input_file
+                if copy_exe_fl:
+                    call_params = sim_code.copy_executable(output_dir, call_params, dryrun_fl)
 
             job_script = write_job_script(submission_params, machine, sim_code, call_params, label='_0',
                                           dryrun_fl=dryrun_fl, safe_job_time_fl=safe_job_time_fl, backup_fl=backup_fl)

@@ -13,6 +13,10 @@ class SimulationCode(abc.ABC):
     SUBCLASS_COUNT = 0
     LOG_PREFIX = 'log'
 
+    EXE_COPY_SUBFOLDER = 'localbin'
+    EXE_FILES_TO_COPY = tuple()
+    EXE_FOLDERS_TO_COPY = tuple()
+
     def __init__(self, name, mandatory_config_labels, optional_config_labels=None, boolean_config_labels=None):
         self.name = name
         self.mandatory_config_labels = mandatory_config_labels
@@ -93,6 +97,19 @@ class SimulationCode(abc.ABC):
             return output_dir
         else:
             raise ValueError('Invalid restart copy mode selected, see documentation for proper usage.')
+
+    def copy_executable(self, output_dir, call_params, dryrun_fl):
+        executable = Path(call_params['executable'].name)
+        new_executable_dir = output_dir / self.EXE_COPY_SUBFOLDER
+        if not dryrun_fl:
+            new_executable_dir.mkdir(parents=True)
+            shutil.copy(executable, new_executable_dir / executable)
+            for exe_file in self.EXE_FILES_TO_COPY:
+                shutil.copy(exe_file, new_executable_dir / exe_file)
+            for exe_folder in self.EXE_FOLDERS_TO_COPY:
+                shutil.copytree(exe_folder, new_executable_dir / exe_folder)
+        call_params['executable'] = new_executable_dir / executable
+        return call_params
 
     @abc.abstractmethod
     def print_config_options(self, config_opts):

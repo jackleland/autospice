@@ -27,6 +27,14 @@ class Spice(SimulationCode):
         2: '$1',
         3: '$2',
     }
+    EXE_FILES_TO_COPY = (
+        'fu_iz.dat',
+        'fu_iz_maxwell.dat',
+        'fu_ez.dat',
+    )
+    EXE_FOLDERS_TO_COPY = (
+        'DF',
+    )
 
     def __init__(self):
         super().__init__('spice',
@@ -194,11 +202,13 @@ class Spice(SimulationCode):
             f'BU_FOLDER="{output_dir}/backup_$(env TZ=GB date +"%Y%m%d-%H%M")"\n'
             'echo "Making backup of simulation data into $BU_FOLDER"\n'
             'mkdir "$BU_FOLDER"\n'
-            f"rsync -azvp --exclude='backup*' {t_file}.mat $BU_FOLDER\n"
-            f"rsync -azvp --exclude='backup*' --exclude='*.mat' --exclude='*ongoing*' {output_dir}/* $BU_FOLDER\n"
+            f"rsync -azvp --exclude='{self.EXE_COPY_SUBFOLDER}*' --exclude='backup*' {t_file}.mat $BU_FOLDER\n"
+            f"rsync -azvp --exclude='{self.EXE_COPY_SUBFOLDER}*' --exclude='backup*' --exclude='*.mat' "
+            f"--exclude='*ongoing*' {output_dir}/* $BU_FOLDER\n"
         )
         if backup_fl:
-            postcall_str += f"rsync -azvp --exclude='backup*' {output_dir}/* $BU_FOLDER\n"
+            postcall_str += (f"rsync -azvp --exclude='{self.EXE_COPY_SUBFOLDER}*' --exclude='backup*' " 
+                             f"{output_dir}/* $BU_FOLDER\n")
 
         # Cancel all subsequent jobs if it looks like the simulation has finished
         postcall_str += (
