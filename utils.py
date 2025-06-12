@@ -14,6 +14,7 @@ def find_next_available_dir(directory):
         dummy_dir = dummy_dir.parent / Path(f"{directory.stem}_{i}_")
     return dummy_dir
 
+
 # TODO: This has been temporarily removed due to the git repo object not being present.
 #
 # from warnings import warn
